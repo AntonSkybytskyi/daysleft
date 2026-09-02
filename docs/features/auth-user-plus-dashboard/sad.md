@@ -33,6 +33,23 @@ target_surfaces: []
 
 ## 2. Constraints
 
+**Technical.**
+- TypeScript on Node.js 20+
+- Next.js 14+ (App Router), React, Tailwind CSS
+- PostgreSQL, accessed via Drizzle ORM
+- Architecture convention: feature-first modules under `src/modules/<name>/` (ui / app / data layers), no shared "components/services/hooks" grab-bag folders (architecture-map.md)
+
+**Organisational.**
+- Deadline / effort budget / team composition — not yet set by PM (TBD; see §11 risk row)
+
+**Conventions.**
+- `docs/architecture-map.md` §Conventions
+- Unified error envelope `{ error: { code, message } }`; UUIDv7 IDs generated app-side; Drizzle-only persistence, no raw SQL outside `src/db/`; Vitest (unit) + Playwright (e2e)
+
+**Regulatory / external.**
+- No named compliance regime (e.g. no GDPR/HIPAA scope stated in spec)
+- Security review required before ship (spec §6.1) — first authentication boundary and first PII collection in the app (email, OAuth provider account identifier, session token, browser-reported locale)
+
 ## 3. Context and scope
 
 ## 4. Solution strategy
