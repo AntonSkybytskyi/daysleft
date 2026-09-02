@@ -146,6 +146,52 @@ C4Container
 
 ## 6. Runtime view
 
+**Critical flow 1: Sign in and reach the dashboard (US-01/US-02 happy path)**
+
+```mermaid
+sequenceDiagram
+    actor Traveler
+    participant Web UI
+    participant API routes
+    participant Clerk
+    participant Postgres
+
+    Traveler->>Web UI: chooses Google, GitHub, or magic-link
+    Web UI->>Clerk: starts sign-in
+    Clerk-->>Traveler: provider consent, or magic-link email
+    Traveler->>Clerk: completes consent, or clicks the link
+    Clerk->>API routes: webhook — user created or matched by verified email
+    API routes->>Postgres: upserts users shadow row
+    Clerk-->>Web UI: session established
+    Web UI->>API routes: requests the dashboard
+    API routes->>Clerk: verifies the session
+    Clerk-->>API routes: valid
+    API routes-->>Web UI: dashboard data (empty state)
+    Web UI-->>Traveler: shows the dashboard
+```
+
+**Critical flow 2: Complete server-side logout (US-05, security quality goal)**
+
+```mermaid
+sequenceDiagram
+    actor Traveler
+    participant Web UI
+    participant API routes
+    participant Clerk
+
+    Traveler->>Web UI: selects Log out
+    Web UI->>API routes: logout request
+    API routes->>Clerk: revokes the session server-side
+    Clerk-->>API routes: session revoked
+    API routes-->>Web UI: redirect to login
+    Web UI-->>Traveler: shows the login screen
+    Traveler->>Web UI: later, tries the dashboard again on the same browser
+    Web UI->>API routes: requests the dashboard
+    API routes->>Clerk: verifies the session
+    Clerk-->>API routes: invalid or expired
+    API routes-->>Web UI: redirect to login, return-to preserved
+```
+
 ## 7. Deployment view
 
 ## 8. Crosscutting concepts
