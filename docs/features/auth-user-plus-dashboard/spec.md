@@ -17,15 +17,15 @@ daysleft is a greenfield visa/travel day-count tracker with no code shipped yet.
 
 Why now: `survey` has already fixed the module boundaries (`auth`, `dashboard` in `docs/architecture-map.md`), but nothing is wired end-to-end yet; the auth-solution pick itself is reopened (see §8). This feature proves the auth + dashboard shell works before any trip or rule data lands on top of it, unblocking every subsequent feature that assumes a signed-in Traveler.
 
-Committed approach: passwordless authentication only — OAuth (Google, GitHub) plus magic-link email, no password at all — with email-based account linking so the same person never ends up with two accounts regardless of which method they used. The dashboard route is session-gated (unauthenticated visitors are redirected to login and returned to the page they requested afterward), logout (in the page header) fully ends the session, and the dashboard itself ships as an empty-state shell that later features populate. i18n plumbing is wired end-to-end now, with only English content populated.
+Committed approach: passwordless authentication only — OAuth (Google, GitHub) plus magic-link email, no password at all — with email-based account linking so the same person never ends up with two accounts regardless of which method they used. The dashboard route is session-gated (unauthenticated visitors are redirected to login and returned to the page they requested afterward), logout (in the page header) fully ends the session on that browser, and the dashboard itself ships as an empty-state shell that later features populate. i18n plumbing ships now at minimal scope — a message catalog + translate helper with English strings extracted into it — with only English content populated; locale-aware date/number/currency formatting and locale-prefixed routing are not part of this slice.
 
-Decisions carried from the ideation pass: account-linking by verified email (closes the "same email via two providers creates two accounts" failure mode); logout must end the session server-side, not just clear a client cookie (closes the "still logged in after logout" failure mode); the post-login return-to destination is validated against the app's own routes (closes the open-redirect failure mode); i18n plumbing ships now specifically because it's cheap today and expensive to retrofit once real locale-dependent content (dates, currency, day-counts) exists.
+Decisions carried from the ideation pass: account-linking by verified email (closes the "same email via two providers creates two accounts" failure mode); logout ends the session server-side on the current browser, not just a client cookie clear (closes the "still logged in after logout" failure mode; a global all-devices logout is explicitly not this slice's scope); the post-login return-to destination is validated against the app's own origin (closes the open-redirect failure mode); i18n plumbing ships now at minimal scope specifically because string extraction is cheap today and expensive to retrofit once real locale-dependent content (dates, currency, day-counts) exists — deeper locale-aware formatting is deferred until a second locale is actually scheduled.
 
 ## 2. Goals
 
 - Give Travelers a frictionless, password-free way to create an account and reach their dashboard.
 - Establish the session-gated foundation every future feature (trips, rules, dashboard content) builds on.
-- Ship the i18n foundation now so future localization is additive, not a rewrite.
+- Ship a minimal i18n foundation now (message catalog + string extraction) so future localization is additive, not a rewrite.
 
 ## 3. Non-goals
 
@@ -33,6 +33,8 @@ Decisions carried from the ideation pass: account-linking by verified email (clo
 - Multi-role support (staff/admin roles, family/group accounts) — out of scope now; the single Traveler role covers this slice, and the account model is not being pre-built for roles that don't exist yet.
 - Populated dashboard content (day-count summaries, visa-run alerts) — out of scope; this slice ships the shell only, content depends on the not-yet-built trips/rules modules.
 - Additional locales beyond English — out of scope; the i18n plumbing ships now but translated content is future work.
+- Locale-aware date/number/currency formatting and locale-prefixed routing/negotiation — out of scope for this slice; the i18n foundation is a message catalog + string extraction only, formatting depth is added when a second locale is actually scheduled.
+- Cross-device logout / revoking sessions on other devices — out of scope; logout in this slice ends the session only on the browser that performed it.
 - Offline behavior of the auth/dashboard shell — out of scope; establishing a session inherently needs network, and offline-mode behavior for a signed-in Traveler is the `sync` feature's concern, not this slice's.
 
 ## 4. User stories
@@ -61,11 +63,11 @@ Decisions carried from the ideation pass: account-linking by verified email (clo
 **I want** the dashboard to be reachable only when I'm signed in
 **So that** my (future) trip and day-count data stays private
 
-### US-05: Log out completely
+### US-05: Log out completely on this device
 
 **As a** Traveler
-**I want** logging out from the header to fully end my session
-**So that** nobody using this device or browser afterward can see my account
+**I want** logging out from the header to fully end my session on this device
+**So that** nobody using this browser afterward can see my account
 
 ### US-06: See a clear empty dashboard
 
@@ -83,15 +85,27 @@ Decisions carried from the ideation pass: account-linking by verified email (clo
 
 ### AC-01 (US-01) — happy path
 
-**Given** a person with no daysleft account uses Google, GitHub, or a magic-link email for the first time
+**Given** a person uses Google, GitHub, or a magic-link email to authenticate — whether or not they've done so before
 **When** they complete the chosen method
-**Then** the system creates their Traveler account and shows them the dashboard
+**Then** the system signs them into their account, creating one on first use, and shows them the dashboard
+
+### AC-01b (US-01) — error
+
+**Given** a Traveler authenticates via Google or GitHub but declines or revokes the provider's consent, or the provider is unavailable when the callback returns
+**When** the sign-in attempt fails
+**Then** the system tells the Traveler sign-in didn't complete and lets them retry with any supported method
 
 ### AC-02 (US-01) — error
 
-**Given** a Traveler clicks a magic-link email that has expired or was already used
+**Given** a Traveler clicks a magic-link email more than 15 minutes after it was sent, that was already used, or that was superseded by a newer link request for the same email
 **When** they attempt to complete sign-in with it
 **Then** the system blocks the sign-in, tells the Traveler the link is no longer valid, and offers to send a new one
+
+### AC-02b (US-01) — happy path
+
+**Given** a Traveler requests a magic-link on one device and opens it on a different device or browser
+**When** they complete sign-in from the link
+**Then** the system signs them in there and shows them the dashboard directly, without attempting to return them to the original device
 
 ### AC-03 (US-02) — domain invariant
 
@@ -99,27 +113,33 @@ Decisions carried from the ideation pass: account-linking by verified email (clo
 **When** the same person signs in using a different method (e.g. magic-link) with that same verified email
 **Then** the system signs them into their existing account rather than creating a second one, and tells them they've signed in to their existing account
 
+### AC-03b (US-02) — domain invariant
+
+**Given** a Traveler attempts to sign in via an OAuth provider that does not return a verified email address
+**When** the sign-in attempt is made
+**Then** the system blocks account creation, tells the Traveler an email is required, and asks them to make one visible/verified with that provider before retrying
+
 ### AC-04 (US-03) — happy path
 
-**Given** an unauthenticated visitor is redirected to login while trying to reach the dashboard
+**Given** an unauthenticated visitor is redirected to login while trying to reach the dashboard, and completes sign-in in that same browser (via OAuth, or a magic-link opened there)
 **When** they complete sign-in
 **Then** the system returns them to the dashboard page they originally requested, not a generic landing page
 
 ### AC-05 (US-04) — authorization
 
-**Given** no Traveler session exists
+**Given** no Traveler session exists, or an existing session has expired or is no longer valid
 **When** a visitor requests the dashboard directly
-**Then** the system denies access, reveals no account or dashboard data, and redirects them to sign in
+**Then** the system denies access, reveals no account or dashboard data, and redirects them to sign in, preserving the page they were trying to reach the same way AC-04 does
 
 ### AC-06 (US-05) — happy path
 
 **Given** a signed-in Traveler selects log out from the header
 **When** the action completes
-**Then** the system ends their session everywhere it was active, and the dashboard is no longer reachable from that browser without signing in again
+**Then** the system ends their session on that browser server-side (not only a client-side cookie clear), and the dashboard is no longer reachable from that browser without signing in again; sessions on other devices are unaffected
 
 ### AC-07 (US-06) — cross-context
 
-**Given** a Traveler has no trips recorded in the trips context yet
+**Given** a Traveler has recorded no trips yet
 **When** they view the dashboard
 **Then** the system shows an explicit "nothing tracked yet" empty state, not an error or a blank page
 
@@ -135,9 +155,12 @@ Decisions carried from the ideation pass: account-linking by verified email (clo
 |---|---|---|
 | Latency p95 auth handoff (start sign-in → provider/redirect shown) | ≤ 300 ms | server timing metric on the sign-in initiation |
 | Latency p95 dashboard first render after successful auth | ≤ 500 ms | client navigation timing, post-auth |
-| Throughput | ≥ 5 req/s per instance | smoke test in CI |
-| Availability | 99.5% | monthly SLO window |
+| Throughput | ≥ 5 req/s per instance | smoke test in CI against the combined auth-handoff + dashboard-render endpoints |
+| Availability | 99.5% | synthetic uptime probe against the login page, monthly SLO window |
 | Account uniqueness | 0 duplicate accounts per verified email | monitored: duplicate-account count per verified email, target 0 |
+| Session duration | 7-day sliding expiry (renews on activity) | session-store expiry field, verified in tests |
+| Magic-link duration | ≤ 15 min, single-use; a new request for the same email invalidates prior outstanding links | link-store expiry + supersede check, verified in tests |
+| Magic-link send rate | ≤ 5 requests per email address per hour | rate-limit counter per email address |
 
 ## 6.1 Security / privacy
 
@@ -145,10 +168,10 @@ Decisions carried from the ideation pass: account-linking by verified email (clo
 - **Personal data touched:** email address (from OAuth provider or magic-link), OAuth provider account identifier, session token, browser-reported locale.
 - **AuthZ/AuthN impact:** introduces the app's first authentication boundary — a valid session is required to reach the dashboard route. Only one role exists (Traveler); no differentiated permissions within the app yet.
 - **Abuse cases:**
-  - open redirect via the post-login return-to destination: system only follows a return-to destination that is one of the app's own routes, otherwise falls back to the dashboard.
-  - magic-link send abuse (unauthenticated relay/spam): system rate-limits magic-link sends per email address and per requesting device.
-  - stale session survives logout: system invalidates the session everywhere, not only in the requesting browser, so a cached or previously-open tab can't keep using it (AC-06).
-  - account takeover via email confusion: the system only links a new sign-in method to an existing account when the email is verified by the method itself (OAuth-verified email, or a clicked magic-link), never on an unverified claim.
+  - open redirect via the post-login return-to destination: system only follows a return-to destination whose resolved URL shares this app's own origin (scheme, host, and port); anything else is discarded in favor of the default dashboard destination.
+  - magic-link send abuse (unauthenticated relay/spam): system rate-limits magic-link sends to ≤5 per email address per hour (§6); a Traveler hitting the limit is told to wait rather than the system silently succeeding or failing.
+  - stale session survives logout: system invalidates the session server-side on the browser that logged out, so a cached or previously-open tab on that browser can't keep using it (AC-06); other devices are unaffected — a global all-devices revoke is explicitly out of scope (§3).
+  - account takeover via email confusion: the system only links a new sign-in method to an existing account when the email is verified by the method itself (OAuth-verified email, or a clicked magic-link), never on an unverified claim; an OAuth provider that returns no verified email is blocked from creating or linking an account (AC-03b).
 - **Security review:** Required — first authentication boundary and first PII collection in the app.
 
 ## 7. Metrics / KPIs
