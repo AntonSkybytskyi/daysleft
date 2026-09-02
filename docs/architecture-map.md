@@ -4,9 +4,9 @@ mode: greenfield-bootstrap
 updated_at: "2026-09-02"
 reflects_commit: "53d3d41"
 language: "typescript (node 20+)"
-build_cmd: "npm run build"
-test_cmd: "npm run test"
-lint_cmd: "npm run lint"
+build_cmd: "pnpm build"
+test_cmd: "pnpm test"
+lint_cmd: "pnpm lint"
 migration_tool: "drizzle-kit"
 frontend: "next.js (app router) + tailwind"
 ---
@@ -23,7 +23,8 @@ frontend: "next.js (app router) + tailwind"
 - Frameworks: Next.js 14+, React, Tailwind CSS, Drizzle ORM, Auth.js (NextAuth)
 - Datastore: PostgreSQL (managed instance, e.g. Neon/Supabase/RDS — hosting choice deferred to deployment, not architecture)
 - Offline layer: service worker (PWA) + IndexedDB (Dexie) as the client-side cache/queue that syncs to the API when online
-- Build / test / lint: `npm run build` (next build) / `npm run test` (Vitest unit) + `npm run test:e2e` (Playwright) / `npm run lint` (eslint + tsc --noEmit)
+- Build / test / lint: `pnpm build` (next build) / `pnpm test` (Vitest unit) + `pnpm test:e2e` (Playwright) / `pnpm lint` (eslint + tsc --noEmit)
+- Package manager: pnpm (workspace-ready, strict dependency isolation)
 
 ## C4 — system as it is
 

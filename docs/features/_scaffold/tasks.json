@@ -7,8 +7,8 @@
       "layer": "scaffold",
       "deps": [],
       "acs": [],
-      "dod": "project builds (empty) via `npm run build`",
-      "files_hint": ["src/app/", "src/modules/", "src/db/", "package.json", "tsconfig.json", "tailwind.config.ts"]
+      "dod": "project builds (empty) via `pnpm build`",
+      "files_hint": ["src/app/", "src/modules/", "src/db/", "package.json", "pnpm-lock.yaml", "tsconfig.json", "tailwind.config.ts"]
     },
     {
       "id": "S2",
@@ -16,7 +16,7 @@
       "layer": "scaffold",
       "deps": ["S1"],
       "acs": [],
-      "dod": "empty test suite runs green via `npm run test`; `app boots` Playwright smoke test passes",
+      "dod": "empty test suite runs green via `pnpm test`; `app boots` Playwright smoke test passes",
       "files_hint": ["vitest.config.ts", "playwright.config.ts", "e2e/smoke.spec.ts"]
     },
     {
@@ -52,7 +52,7 @@
       "layer": "scaffold",
       "deps": ["S2"],
       "acs": [],
-      "dod": "CI config is valid; the commands match the detected toolchain (npm run build/test/lint)",
+      "dod": "CI config is valid; the commands match the detected toolchain (pnpm build/test/lint via pnpm/action-setup)",
       "files_hint": [".github/workflows/ci.yml"]
     },
     {
