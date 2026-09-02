@@ -102,6 +102,48 @@ Each tactical decision in later sections should trace to one of these seeds. Tac
 
 ## 5. Building block view
 
+Feature-first modules per `architecture-map.md`'s convention: `auth` owns the Clerk integration, the `users` shadow table, session-read helpers, and the login/check-your-email/magic-link-invalid screens; `dashboard` owns the empty-state shell and header logout. Each module keeps `ui` / `app` / `data(infra)` / `ports` layers, no shared grab-bag folder. The i18n message catalog + `translate()` helper is cross-cutting infrastructure, not business logic, so it lives outside both modules.
+
+**Internal decomposition:**
+
+```
+src/modules/auth/
+├── app/          # session-read helpers, account-linking use case, webhook-sync use case
+├── infra/        # Drizzle repository for the `users` shadow table, Clerk SDK wiring
+├── ports/        # Next.js route handlers: OAuth/magic-link passthrough, Clerk webhook endpoint
+└── ui/           # SCR-01 Login, SCR-02 Check your email, SCR-04 Magic-link invalid
+
+src/modules/dashboard/
+├── app/          # dashboard view-model / empty-state use case
+├── ports/        # session-gated dashboard route handler
+└── ui/           # SCR-03 Dashboard shell + header logout
+
+src/lib/i18n/     # message catalog (en.json) + translate() helper — cross-cutting, not a business module
+```
+
+**C4 Container (L2):**
+
+```mermaid
+C4Container
+    title auth-user-plus-dashboard — Containers
+
+    Person(traveler, "Traveler")
+
+    Container_Boundary(app, "daysleft") {
+        Container(web, "Web UI", "Next.js App Router (RSC)", "Login, check-your-email, dashboard screens")
+        Container(api, "API routes", "Next.js Route Handlers", "OAuth/magic-link passthrough, Clerk webhook, session-gated dashboard data")
+    }
+
+    ContainerDb(db, "Postgres", "PostgreSQL via Drizzle", "users shadow table (Clerk id, verified email)")
+    System_Ext(clerk, "Clerk", "Hosted OAuth + magic-link + session store")
+
+    Rel(traveler, web, "Signs up / signs in / views dashboard / logs out", "HTTPS")
+    Rel(web, api, "Calls", "Server actions / fetch")
+    Rel(api, clerk, "Delegates auth, verifies session, revokes on logout", "Clerk SDK/API")
+    Rel(api, db, "Reads/writes users shadow row", "Drizzle")
+    Rel(clerk, api, "Webhook: user created/updated", "HTTPS")
+```
+
 ## 6. Runtime view
 
 ## 7. Deployment view
