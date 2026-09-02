@@ -31,6 +31,10 @@ yarn-error.log*
 # vercel
 .vercel
 
+# sdd (per-developer)
+.claude/*.local.md
+.worktrees/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
