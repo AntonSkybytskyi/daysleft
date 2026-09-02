@@ -168,7 +168,112 @@ sequenceDiagram
     Web UI-->>Traveler: shows the dashboard
 ```
 
-**Critical flow 2: Complete server-side logout (US-05, security quality goal)**
+**Critical flow 2: OAuth sign-in fails (US-01, AC-01b)**
+
+```mermaid
+sequenceDiagram
+    actor Traveler
+    participant Web UI
+    participant API routes
+    participant Clerk
+
+    Traveler->>Web UI: chooses Google or GitHub
+    Web UI->>Clerk: starts sign-in
+    Clerk-->>Traveler: provider consent screen
+    alt consent declined
+        Traveler->>Clerk: declines consent
+        Clerk-->>Web UI: sign-in not completed
+    else provider unavailable
+        Clerk-->>Web UI: callback error
+    end
+    Web UI-->>Traveler: sign-in didn't complete, retry any method
+```
+
+**Critical flow 3: Magic-link invalid, or completed on a different device (US-01, AC-02/AC-02b)**
+
+```mermaid
+sequenceDiagram
+    actor Traveler
+    participant Web UI
+    participant API routes
+    participant Clerk
+    participant Postgres
+
+    Traveler->>Web UI: requests a magic-link for their email
+    Web UI->>Clerk: sends the magic-link email
+    Clerk-->>Traveler: magic-link email
+    Traveler->>Clerk: clicks the link
+    alt link expired, already used, or superseded
+        Clerk-->>Web UI: link no longer valid
+        Web UI-->>Traveler: shows link invalid, offers to send a new one
+    else link valid, opened on a different device or browser
+        Clerk->>API routes: webhook — user created or matched by verified email
+        API routes->>Postgres: upserts users shadow row
+        Clerk-->>Web UI: session established (on the device that opened the link)
+        Web UI-->>Traveler: shows the dashboard directly, no return to original device
+    end
+```
+
+**Critical flow 4: Account-linking blocked — no verified email from provider (US-02, AC-03b)**
+
+```mermaid
+sequenceDiagram
+    actor Traveler
+    participant Web UI
+    participant API routes
+    participant Clerk
+
+    Traveler->>Web UI: signs in via an OAuth provider
+    Web UI->>Clerk: starts sign-in
+    Clerk-->>API routes: consent granted, no verified email returned
+    API routes-->>Web UI: account creation/linking blocked, email required
+    Web UI-->>Traveler: asks them to verify/expose an email with that provider, then retry
+```
+
+**Critical flow 5: Return to the originally requested page after login (US-03, AC-04)**
+
+```mermaid
+sequenceDiagram
+    actor Traveler
+    participant Web UI
+    participant API routes
+    participant Clerk
+
+    Traveler->>Web UI: requests a dashboard page, unauthenticated
+    Web UI->>API routes: requests the page
+    API routes->>Clerk: verifies the session
+    Clerk-->>API routes: no valid session
+    API routes-->>Web UI: redirect to login, return-to = originally requested page
+    Traveler->>Web UI: completes sign-in in the same browser (OAuth or magic-link)
+    Web UI->>API routes: requests the return-to page
+    API routes->>Clerk: verifies the session
+    Clerk-->>API routes: valid
+    API routes-->>Web UI: the originally requested page (return-to validated against this app's own origin)
+    Web UI-->>Traveler: shows the originally requested page
+```
+
+**Critical flow 6: Unauthenticated dashboard access denied (US-04, AC-05)**
+
+```mermaid
+sequenceDiagram
+    actor Traveler
+    participant Web UI
+    participant API routes
+    participant Clerk
+
+    Traveler->>Web UI: requests the dashboard directly
+    Web UI->>API routes: requests dashboard data
+    API routes->>Clerk: verifies the session
+    alt no session
+        Clerk-->>API routes: no session found
+    else session expired or invalid
+        Clerk-->>API routes: expired or invalid
+    end
+    API routes-->>Web UI: access denied, no account or dashboard data returned
+    Web UI-->>Traveler: redirect to login, return-to preserved
+```
+
+**Critical flow 7: Complete server-side logout (US-05, security quality goal)**
 
 ```mermaid
 sequenceDiagram
@@ -189,6 +294,9 @@ sequenceDiagram
     Clerk-->>API routes: invalid or expired
     API routes-->>Web UI: redirect to login, return-to preserved
 ```
+
+<!-- AC-07 (empty dashboard, US-06): covered by Flow 1's "dashboard data (empty state)" step — no dedicated flow needed. -->
+<!-- AC-08 (i18n render, US-07): N/A — client-side locale render on every screen, not a distinct service call or runtime path. -->
 
 ## 7. Deployment view
 
