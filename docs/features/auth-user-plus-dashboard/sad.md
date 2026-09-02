@@ -15,6 +15,22 @@ target_surfaces: []
 
 ## 1. Introduction and goals
 
+**Intent.** Delivers the first user-facing vertical slice of daysleft: passwordless account creation (Google/GitHub OAuth or magic-link email) with account-linking by verified email, a session-gated dashboard shell, complete server-side logout, and a minimal i18n foundation. Establishes the auth boundary and dashboard route every future trip/day-count feature builds on.
+
+**Top-3 quality goals (1-liners; full scenarios in §10):**
+
+1. Security of the first authentication boundary — no open redirect, no duplicate accounts, complete server-side logout (spec §6.1)
+2. Latency of the auth handoff (≤300ms p95) and first dashboard render (≤500ms p95) (spec §6)
+3. Availability of the login/dashboard path (99.5% SLO) — the foundation every later feature depends on
+
+**Stakeholders.**
+
+| Role | Interest | Sign-off owner? |
+|---|---|---|
+| Traveler | signs up, signs in, uses the dashboard | No |
+| Tech Lead | SAD approval | Yes |
+| Security Lead | security review sign-off (spec §6.1: required — first auth boundary + first PII collection) | Yes |
+
 ## 2. Constraints
 
 ## 3. Context and scope
