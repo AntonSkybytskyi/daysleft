@@ -45,6 +45,8 @@ target_surfaces: [backend-service, web-frontend]
 **Conventions.**
 - `docs/architecture-map.md` §Conventions
 - Unified error envelope `{ error: { code, message } }`; UUIDv7 IDs generated app-side; Drizzle-only persistence, no raw SQL outside `src/db/`; Vitest (unit) + Playwright (e2e)
+- **Override:** `architecture-map.md` named Auth.js/NextAuth as the auth approach and planned `auth` as `app`/`infra` layers only (no `ui`, assuming a library's built-in pages). Superseded by ADR-0001 (§4): Clerk is the auth solution, and `auth` gains a `ui` layer since its screens (SCR-01/02/04) are composed with our own design canon (`docs/design-system.md`) rather than a library's built-in pages. `architecture-map.md` should be refreshed via `survey` after this feature ships.
+- UI foundation: `docs/design-system.md` (tool: code, established) — SCR-01…04 compose from its component inventory, currently empty (first UI feature).
 
 **Regulatory / external.**
 - No named compliance regime (e.g. no GDPR/HIPAA scope stated in spec)
@@ -61,9 +63,9 @@ daysleft is a visa/travel day-count tracker. A Traveler creates an account and r
 | Actor or system | Type | Interaction |
 |---|---|---|
 | Traveler | Person | Authenticates, views the dashboard, logs out |
-| Google OAuth | System (external) | Provides OAuth 2.0 consent + a verified email address |
-| GitHub OAuth | System (external) | Provides OAuth 2.0 consent + a verified email address |
-| Email delivery service | System (external) | Sends magic-link sign-in emails to the Traveler (mechanism decided in §4) |
+| Clerk | System (external) | Hosted identity provider — brokers Google/GitHub OAuth consent, sends magic-link emails, and holds the session record (ADR-0001) |
+
+<!-- Google OAuth and GitHub OAuth are reached via Clerk, not directly by daysleft — outside this system's boundary since ADR-0001 (§4). -->
 
 **C4 Context (L1):**
 
@@ -75,14 +77,10 @@ C4Context
 
     System(daysleft, "daysleft", "Passwordless auth + session-gated dashboard shell")
 
-    System_Ext(google, "Google OAuth", "OAuth 2.0 identity provider")
-    System_Ext(github, "GitHub OAuth", "OAuth 2.0 identity provider")
-    System_Ext(email, "Email delivery service", "Sends magic-link sign-in emails")
+    System_Ext(clerk, "Clerk", "Hosted OAuth (Google/GitHub) + magic-link email + session store")
 
     Rel(traveler, daysleft, "Signs up / signs in / views dashboard / logs out", "HTTPS")
-    Rel(daysleft, google, "Requests consent, receives verified email", "OAuth 2.0 / HTTPS")
-    Rel(daysleft, github, "Requests consent, receives verified email", "OAuth 2.0 / HTTPS")
-    Rel(daysleft, email, "Sends magic-link email", "SMTP/API")
+    Rel(daysleft, clerk, "Delegates sign-in, verifies session, revokes on logout", "Clerk SDK/API")
 ```
 
 ## 4. Solution strategy
@@ -109,13 +107,13 @@ Feature-first modules per `architecture-map.md`'s convention: `auth` owns the Cl
 ```
 src/modules/auth/
 ├── app/          # session-read helpers, account-linking use case, webhook-sync use case
-├── infra/        # Drizzle repository for the `users` shadow table, Clerk SDK wiring
-├── ports/        # Next.js route handlers: OAuth/magic-link passthrough, Clerk webhook endpoint
-└── ui/           # SCR-01 Login, SCR-02 Check your email, SCR-04 Magic-link invalid
+├── infra/        # Drizzle repository for the `users` shadow table, Clerk SDK wiring,
+                   # and the Next.js route handlers (OAuth/magic-link passthrough, Clerk webhook)
+└── ui/           # SCR-01 Login, SCR-02 Check your email, SCR-04 Magic-link invalid — NEW vs.
+                   # architecture-map.md's original app/infra-only plan (§2 override, Clerk screens)
 
 src/modules/dashboard/
-├── app/          # dashboard view-model / empty-state use case
-├── ports/        # session-gated dashboard route handler
+├── app/          # dashboard view-model / empty-state use case, incl. the session-gated route handler
 └── ui/           # SCR-03 Dashboard shell + header logout
 
 src/lib/i18n/     # message catalog (en.json) + translate() helper — cross-cutting, not a business module
@@ -215,7 +213,7 @@ Single Next.js deployable (§5), horizontally scaled behind a load balancer. Req
 | Internationalisation | Message catalog `src/lib/i18n/en.json` + a `translate(key)` helper reading the browser's `Accept-Language`, falling back to English (AC-08); no locale-prefixed routing, no per-locale date/number/currency formatting (spec non-goals) | §5, spec §3 |
 | Observability | Tracing spans at the API route boundary | §7 |
 | Events | N/A — no internal event bus in this feature; the Clerk webhook is inbound HTTP, not an internal event | — |
-| Rate-limiting | Magic-link send rate delegated to Clerk's internal throttling (§4); flagged as a §11 risk | §4, §11 |
+| Rate-limiting | Magic-link send rate delegated to Clerk's internal throttling (§4); when Clerk rejects a send for hitting its throttle, our API route surfaces that as a distinct error code in the unified error envelope, which SCR-02 renders as "too many requests, try again later" (spec §6.1: never a silent success or failure) — the SCR-02 rate-limited state itself is added when `screens` runs. Flagged as a §11 risk. | §4, §11 |
 
 ## 9. Architecture decisions
 
