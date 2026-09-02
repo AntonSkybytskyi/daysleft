@@ -219,7 +219,30 @@ Single Next.js deployable (§5), horizontally scaled behind a load balancer. Req
 
 ## 9. Architecture decisions
 
+| # | Title | Status | Section |
+|---|---|---|---|
+| 0001 | Use Clerk for passwordless auth | Accepted | §4 |
+
+ADR files live under `docs/features/auth-user-plus-dashboard/adr/NNNN-<title>.md`.
+
 ## 10. Quality requirements
+
+Each top-3 goal from §1 expanded into a full scenario:
+
+**QG-1. Security of the first authentication boundary**
+- **When:** a Traveler completes sign-in via any method, logs out, or a stale/invalid session tries to reach the dashboard
+- **Then:** account uniqueness holds (0 duplicate accounts per verified email); logout ends the session server-side so the dashboard is unreachable from that browser without signing in again (AC-06); any return-to destination is validated against the app's own origin — no open redirect (spec §6.1)
+- **How verify:** integration tests asserting (a) two sign-ins with the same verified email via different methods resolve to one account, (b) a dashboard request after logout on the same session is denied, (c) an off-origin return-to param is rejected; the duplicate-account-count monitor (§7) targets 0
+
+**QG-2. Latency of the auth handoff and first dashboard render**
+- **When:** a Traveler starts sign-in, or completes auth and lands on the dashboard
+- **Then:** server timing on sign-in initiation ≤ 300 ms p95; client navigation timing on dashboard first render (post-auth) ≤ 500 ms p95 (spec §6)
+- **How verify:** the §7 server-timing and client-navigation-timing metrics tracked against these p95 targets; a CI smoke test asserting ≥ 5 req/s per instance on the combined auth-handoff + dashboard-render endpoints (spec §6 throughput row)
+
+**QG-3. Availability of the login/dashboard path**
+- **When:** ongoing, any time
+- **Then:** 99.5% uptime over a monthly SLO window (spec §6)
+- **How verify:** the §7 synthetic uptime probe against the login page, monthly SLO window
 
 ## 11. Risks and technical debt
 
