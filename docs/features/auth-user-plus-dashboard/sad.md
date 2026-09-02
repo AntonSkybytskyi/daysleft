@@ -52,6 +52,39 @@ target_surfaces: []
 
 ## 3. Context and scope
 
+daysleft is a visa/travel day-count tracker. A Traveler creates an account and reaches a private dashboard using passwordless authentication (Google, GitHub, or a magic-link email) — never a password. The system verifies identity via external OAuth providers or a self-issued magic-link email, then serves a session-gated dashboard from its own origin.
+
+<!-- brownfield: N/A — greenfield repo, no code exists yet (architecture-map.md) -->
+
+**External systems (in / out):**
+
+| Actor or system | Type | Interaction |
+|---|---|---|
+| Traveler | Person | Authenticates, views the dashboard, logs out |
+| Google OAuth | System (external) | Provides OAuth 2.0 consent + a verified email address |
+| GitHub OAuth | System (external) | Provides OAuth 2.0 consent + a verified email address |
+| Email delivery service | System (external) | Sends magic-link sign-in emails to the Traveler (mechanism decided in §4) |
+
+**C4 Context (L1):**
+
+```mermaid
+C4Context
+    title auth-user-plus-dashboard — System Context
+
+    Person(traveler, "Traveler", "Creates an account and reaches their dashboard, password-free")
+
+    System(daysleft, "daysleft", "Passwordless auth + session-gated dashboard shell")
+
+    System_Ext(google, "Google OAuth", "OAuth 2.0 identity provider")
+    System_Ext(github, "GitHub OAuth", "OAuth 2.0 identity provider")
+    System_Ext(email, "Email delivery service", "Sends magic-link sign-in emails")
+
+    Rel(traveler, daysleft, "Signs up / signs in / views dashboard / logs out", "HTTPS")
+    Rel(daysleft, google, "Requests consent, receives verified email", "OAuth 2.0 / HTTPS")
+    Rel(daysleft, github, "Requests consent, receives verified email", "OAuth 2.0 / HTTPS")
+    Rel(daysleft, email, "Sends magic-link email", "SMTP/API")
+```
+
 ## 4. Solution strategy
 
 ## 5. Building block view
