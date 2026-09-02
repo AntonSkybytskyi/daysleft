@@ -206,6 +206,17 @@ Single Next.js deployable (§5), horizontally scaled behind a load balancer. Req
 
 ## 8. Crosscutting concepts
 
+| Concept | Convention | Where defined |
+|---|---|---|
+| Logging | Structured, fields `module=<name>` | `architecture-map.md` §Conventions |
+| Authentication | Clerk-issued session, verified server-side via the Clerk SDK on every protected request | §4 ADR-0001 |
+| Error handling | Unified error envelope `{ error: { code, message } }`; AC-01b/AC-02/AC-03b each map to a distinct error code | `architecture-map.md` §Conventions |
+| ID strategy | New daysleft entities use UUIDv7 (repo convention); the `users` shadow table's primary key is the Clerk-issued user id itself (already globally unique — avoids a redundant mapping table). Finalized in `data-model`. | here |
+| Internationalisation | Message catalog `src/lib/i18n/en.json` + a `translate(key)` helper reading the browser's `Accept-Language`, falling back to English (AC-08); no locale-prefixed routing, no per-locale date/number/currency formatting (spec non-goals) | §5, spec §3 |
+| Observability | Tracing spans at the API route boundary | §7 |
+| Events | N/A — no internal event bus in this feature; the Clerk webhook is inbound HTTP, not an internal event | — |
+| Rate-limiting | Magic-link send rate delegated to Clerk's internal throttling (§4); flagged as a §11 risk | §4, §11 |
+
 ## 9. Architecture decisions
 
 ## 10. Quality requirements
