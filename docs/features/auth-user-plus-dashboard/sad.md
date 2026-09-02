@@ -246,4 +246,26 @@ Each top-3 goal from §1 expanded into a full scenario:
 
 ## 11. Risks and technical debt
 
+<!-- brownfield gotchas: N/A — greenfield repo, no code exists yet -->
+
+| Risk / debt | Severity | Mitigation | Owner |
+|---|---|---|---|
+| Deadline / effort budget / team composition not yet set (§2) | Low | PM sets these before `implement` starts | PM |
+| Magic-link send-rate NFR (≤5/email/hour, spec §6) is delegated to Clerk's own internal throttling, whose exact threshold we haven't independently confirmed | Medium | Confirm Clerk's actual throttle via their docs/support before ship; if it diverges from ≤5/hour, add an app-level Postgres-backed counter or patch spec §6's wording | Tech Lead |
+| Clerk outage/incident directly affects login/dashboard availability (99.5% SLO) — a dependency outside our control (ADR-0001) | Medium | Monitor Clerk's status page; define an incident playbook; consider a status-page banner as a user-facing fallback | Tech Lead |
+| A missed or delayed Clerk webhook leaves the local `users` shadow table stale — a dashboard request could arrive before the shadow row exists | Medium | Add a synchronous create-or-fetch fallback on the first authenticated request (in addition to the webhook), so AC-01's "creates one on first use" doesn't depend solely on webhook timing | Backend |
+
+**Accepted debt (acceptable in v1, plan to fix later):**
+- Exact Postgres/app hosting target is undecided (§7) — an ops decision deferred past this SAD, not a v1 blocker.
+- No app-level enforcement of the exact magic-link rate limit — accepted for v1 pending the Clerk-throttle confirmation above.
+
 ## 12. Glossary
+
+| Term | Meaning |
+|---|---|
+| Traveler | A person who signs up to track their own visa day-counts; one account = one traveler, no multi-user/org concept (CONTEXT.md) |
+| Magic-link | A single-use, time-limited (≤15 min) sign-in link emailed to a Traveler in place of a password |
+| Account-linking | Matching a new sign-in method to an existing account by verified email, so one person never ends up with two accounts (spec AC-03) |
+| `users` shadow table | The local Postgres table holding a minimal mirror of Clerk's account record (Clerk user id + verified email), kept in sync by webhook, so other daysleft modules can foreign-key to a local id |
+| Return-to destination | The page a Traveler was trying to reach before being redirected to login; restored after sign-in, validated to share the app's own origin (spec §6.1) |
+| Session | The server-side record of a signed-in Traveler, held and revocable by Clerk; ends immediately on logout, not just a client cookie clear (AC-06) |
