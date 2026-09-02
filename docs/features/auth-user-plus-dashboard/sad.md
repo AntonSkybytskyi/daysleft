@@ -194,6 +194,16 @@ sequenceDiagram
 
 ## 7. Deployment view
 
+Single Next.js deployable (§5), horizontally scaled behind a load balancer. Requests are stateless per-instance — session state lives in Clerk, not in-process — so any instance can serve any request; no sticky sessions needed. Exact replica count / hosting target is an ops decision outside this SAD's scope (`architecture-map.md` leaves Postgres/app hosting unspecified).
+
+**Monitoring:**
+- Metrics: server timing metric on sign-in initiation (spec §6 auth-handoff NFR); client navigation timing on dashboard first render; duplicate-account count per verified email (target 0, spec §6)
+- Alerts: auth-handoff p95 > 300ms → page on-call; dashboard first-render p95 > 500ms → page on-call; synthetic uptime probe failure on the login page → page on-call (99.5% SLO, spec §6)
+- Tracing: spans on the API route boundary (sign-in initiation, dashboard data fetch, logout)
+
+**Scaling thresholds:**
+- No concrete threshold yet — spec §6 states only a floor (≥5 req/s per instance); add a real scale-up trigger once production traffic data exists
+
 ## 8. Crosscutting concepts
 
 ## 9. Architecture decisions
