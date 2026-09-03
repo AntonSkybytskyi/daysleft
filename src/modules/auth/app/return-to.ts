@@ -1,19 +1,17 @@
-import { DASHBOARD_PATH } from "./get-dashboard";
-
-export function resolveReturnTo(rawReturnTo: string | null, requestOrigin: string): string {
+export function resolveReturnTo(rawReturnTo: string | null, requestOrigin: string, defaultPath: string): string {
   if (!rawReturnTo) {
-    return DASHBOARD_PATH;
+    return defaultPath;
   }
 
   let resolved: URL;
   try {
     resolved = new URL(rawReturnTo, requestOrigin);
   } catch {
-    return DASHBOARD_PATH;
+    return defaultPath;
   }
 
   if (resolved.origin !== new URL(requestOrigin).origin) {
-    return DASHBOARD_PATH;
+    return defaultPath;
   }
 
   return `${resolved.pathname}${resolved.search}${resolved.hash}`;
@@ -23,7 +21,8 @@ export function resolveLoginReturnTo(
   rawReturnTo: string | null,
   host: string | null,
   proto: string | null,
+  defaultPath: string,
 ): string {
   const origin = `${proto ?? "https"}://${host ?? "localhost"}`;
-  return resolveReturnTo(rawReturnTo, origin);
+  return resolveReturnTo(rawReturnTo, origin, defaultPath);
 }

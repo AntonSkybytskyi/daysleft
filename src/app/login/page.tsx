@@ -1,7 +1,8 @@
 import { headers } from "next/headers";
 import { translate, translateAll } from "@/lib/i18n/translate";
 import { LoginContainer } from "@/modules/auth/ui/login/LoginContainer";
-import { resolveLoginReturnTo } from "@/modules/dashboard/app/return-to";
+import { resolveLoginReturnTo } from "@/modules/auth/app/return-to";
+import { DASHBOARD_PATH } from "@/modules/dashboard/app/get-dashboard";
 import { resolveLoginState, type LoginPageSearchParams } from "@/modules/auth/ui/login/resolve-login-state";
 import type { LoginScreenStrings } from "@/modules/auth/ui/login/LoginScreen";
 
@@ -42,6 +43,7 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
     searchParams.return_to ?? null,
     requestHeaders.get("host"),
     requestHeaders.get("x-forwarded-proto"),
+    DASHBOARD_PATH,
   );
 
   return (

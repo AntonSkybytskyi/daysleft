@@ -39,7 +39,7 @@
 | T31 | Postgres client singleton + env validation | infra | Backend Lead | S | — | done |
 | T32 | Magic-link sign-up fallback | ui | Frontend Lead | S | — | done |
 | T33 | Swap hand-rolled Svix verify for Clerk SDK helper | infra | Backend Lead | S | T29 | done |
-| T34 | Move return-to validation into auth module | wiring | Backend Lead | S | T18, T28 | todo |
+| T34 | Move return-to validation into auth module | wiring | Backend Lead | S | T18, T28 | done |
 | T35 | Fix migration slot reuse + db:down runner | migration | Backend Lead | S | — | done |
 | T36 | Register Alert success variant | docs | Frontend Lead | S | — | done |
 | T37 | Replace skipped e2e stubs with real coverage | tests | Frontend Lead | M | T18, T19, T20, T21, T22, T23 | todo |

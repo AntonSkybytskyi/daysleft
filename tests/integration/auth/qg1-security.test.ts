@@ -7,9 +7,9 @@ import * as schema from "@/db/schema";
 import { handleClerkWebhook } from "@/modules/auth/infra/routes/clerk-webhook";
 import { UsersRepository } from "@/modules/auth/infra/users-repository";
 import { getSessionUser, type SessionDeps } from "@/modules/auth/app/session";
-import { getDashboard } from "@/modules/dashboard/app/get-dashboard";
+import { getDashboard, DASHBOARD_PATH } from "@/modules/dashboard/app/get-dashboard";
 import { logout } from "@/modules/auth/app/logout";
-import { resolveLoginReturnTo } from "@/modules/dashboard/app/return-to";
+import { resolveLoginReturnTo } from "@/modules/auth/app/return-to";
 
 const webhookSecret = "whsec_test_secret";
 
@@ -102,7 +102,7 @@ describe("QG-1 security scenarios (sad.md §10)", () => {
     // not just the pure helper it delegates to — this is the path an attacker actually controls.
     const attackerReturnTo = "https://evil.example/steal-session";
 
-    const resolved = resolveLoginReturnTo(attackerReturnTo, "daysleft.example", "https");
+    const resolved = resolveLoginReturnTo(attackerReturnTo, "daysleft.example", "https", DASHBOARD_PATH);
 
     expect(resolved).toBe("/dashboard");
     expect(resolved).not.toContain("evil.example");
