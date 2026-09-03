@@ -54,19 +54,27 @@ export function DashboardContainer({ strings }: DashboardContainerProps = {}) {
   }, []);
 
   const handleLogout = async () => {
+    let response: Response;
     try {
-      const response = await fetch("/api/v1/auth/logout", { method: "POST" });
-      if (response.status !== 204) {
-        // The Clerk session may still be live — never tell the Traveler they're signed out
-        // when the server didn't actually revoke it.
-        setStatus("error-logout-failed");
-        return;
-      }
-      await clerk.signOut();
-      router.replace("/login");
+      response = await fetch("/api/v1/auth/logout", { method: "POST" });
     } catch {
       setStatus("error-logout-failed");
+      return;
     }
+    if (response.status !== 204) {
+      // The Clerk session may still be live — never tell the Traveler they're signed out
+      // when the server didn't actually revoke it.
+      setStatus("error-logout-failed");
+      return;
+    }
+    try {
+      await clerk.signOut();
+    } catch {
+      // The server already revoked the session — that's authoritative. Retrying would
+      // only re-POST a logout that now 401s, trapping the user behind an error that can
+      // never resolve while they still hold a stale client JWT.
+    }
+    router.replace("/login");
   };
 
   return <DashboardScreen state={status} onLogout={handleLogout} linked={linked} strings={strings} />;

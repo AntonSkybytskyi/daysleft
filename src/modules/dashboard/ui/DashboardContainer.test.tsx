@@ -33,6 +33,20 @@ describe("DashboardContainer", () => {
     await waitFor(() => expect(screen.getByText(/nothing tracked yet/i)).toBeInTheDocument());
   });
 
+  it("shows the linked-account banner when the dashboard response reports linked:true", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        status: 200,
+        json: async () => ({ user: { id: "u1", email: "a@b.com" }, has_trips: false, linked: true }),
+      }),
+    );
+
+    render(<DashboardContainer />);
+
+    await waitFor(() => expect(screen.getByText(/signed in to your existing account/i)).toBeInTheDocument());
+  });
+
   it("redirects to /login, forwarding the server's return_to, when the dashboard fetch returns 401", async () => {
     vi.stubGlobal(
       "fetch",
@@ -143,6 +157,25 @@ describe("DashboardContainer", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/couldn.t sign you out/i);
     expect(replace).not.toHaveBeenCalledWith("/login");
+  });
+
+  it("redirects to /login even when clerk.signOut() rejects, since the server already revoked the session (204)", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ status: 200, json: async () => ({ user: { id: "u1", email: "a@b.com" }, has_trips: false }) })
+      .mockResolvedValueOnce({ status: 204 });
+    vi.stubGlobal("fetch", fetchMock);
+    signOut.mockRejectedValueOnce(new Error("network blip"));
+
+    render(<DashboardContainer />);
+    await waitFor(() => expect(screen.getByText(/nothing tracked yet/i)).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole("button", { name: "Log out" }));
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/login"));
+    // The server-confirmed revoke is authoritative — retrying would only re-POST a
+    // logout that now 401s (no server session left), trapping the user forever.
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("shows a logout-specific error (not the dashboard-fetch one) instead of redirecting when the logout request rejects (network failure)", async () => {
