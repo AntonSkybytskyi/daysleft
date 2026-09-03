@@ -7,16 +7,18 @@ function buildDbClient(connectionString: string) {
   return drizzle(queryClient, { schema });
 }
 
-let cachedClient: ReturnType<typeof buildDbClient> | undefined;
+const cachedClients = new Map<string, ReturnType<typeof buildDbClient>>();
 
 export function createDbClient(connectionString: string | undefined = process.env.DATABASE_URL) {
   if (!connectionString) {
     throw new Error("DATABASE_URL is not set");
   }
-  if (!cachedClient) {
-    cachedClient = buildDbClient(connectionString);
+  let client = cachedClients.get(connectionString);
+  if (!client) {
+    client = buildDbClient(connectionString);
+    cachedClients.set(connectionString, client);
   }
-  return cachedClient;
+  return client;
 }
 
 export type Db = ReturnType<typeof createDbClient>;

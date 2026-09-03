@@ -22,4 +22,20 @@ describe("createDbClient", () => {
 
     expect(first).toBe(second);
   });
+
+  it("returns distinct clients for two different connection strings instead of always the first one built", async () => {
+    const { createDbClient } = await import("./client");
+
+    const first = createDbClient("postgres://user:pass@localhost:5432/db_a");
+    const second = createDbClient("postgres://user:pass@localhost:5432/db_b");
+
+    expect(first).not.toBe(second);
+  });
+
+  it("still returns the same memoized client for the same connection string called twice", async () => {
+    const { createDbClient } = await import("./client");
+    const url = "postgres://user:pass@localhost:5432/db_c";
+
+    expect(createDbClient(url)).toBe(createDbClient(url));
+  });
 });

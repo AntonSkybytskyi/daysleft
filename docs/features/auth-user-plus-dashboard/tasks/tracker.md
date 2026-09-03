@@ -56,7 +56,7 @@
 | T47 | Wire Clerk testing-token harness for e2e scenario 3 | tests | Frontend Lead | M | T38 | todo |
 | T48 | Fix CheckEmailContainer resend (return_to, sign-up fallback, error labeling) | ui | Frontend Lead | M | T38 | todo |
 | T49 | Make SCR-04 "send new link" actually resend | ui | Frontend Lead | S | T38 | todo |
-| T50 | Key memoized DB client by connection string | infra | Backend Lead | S | — | todo |
+| T50 | Key memoized DB client by connection string | infra | Backend Lead | S | — | done |
 | T51 | Add SCR-03 fetch-failure error state to screens.md | docs | Frontend Lead | S | — | todo |
 | T52 | Verify Clerk middleware coverage for /sso-callback + /check-email | wiring | Backend Lead | S | — | todo |
 
