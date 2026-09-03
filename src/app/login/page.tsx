@@ -2,7 +2,8 @@ import { headers } from "next/headers";
 import { translate, translateAll } from "@/lib/i18n/translate";
 import { LoginContainer } from "@/modules/auth/ui/login/LoginContainer";
 import { resolveLoginReturnTo } from "@/modules/dashboard/app/return-to";
-import type { LoginScreenState, LoginScreenStrings } from "@/modules/auth/ui/login/LoginScreen";
+import { resolveLoginState, type LoginPageSearchParams } from "@/modules/auth/ui/login/resolve-login-state";
+import type { LoginScreenStrings } from "@/modules/auth/ui/login/LoginScreen";
 
 const stringKeys = [
   "login.continueWithGoogle",
@@ -30,21 +31,8 @@ function resolveStrings(acceptLanguage: string | null): Partial<LoginScreenStrin
 }
 
 type LoginPageProps = {
-  searchParams: { return_to?: string; error?: string };
+  searchParams: LoginPageSearchParams;
 };
-
-function resolveState(searchParams: LoginPageProps["searchParams"]): LoginScreenState {
-  if (searchParams.error === "sign_in_failed") {
-    return "error-sign-in-failed";
-  }
-  if (searchParams.error === "email_required") {
-    return "error-email-required";
-  }
-  if (searchParams.return_to) {
-    return "redirected-sign-in-required";
-  }
-  return "default";
-}
 
 export default function LoginPage({ searchParams }: LoginPageProps) {
   const requestHeaders = headers();
@@ -60,7 +48,7 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
     <LoginContainer
       heading={heading}
       returnTo={returnTo}
-      initialState={resolveState(searchParams)}
+      initialState={resolveLoginState(searchParams)}
       strings={resolveStrings(acceptLanguage)}
     />
   );
