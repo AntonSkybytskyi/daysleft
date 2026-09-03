@@ -50,7 +50,10 @@ export function LoginContainer({ heading, returnTo, initialState, strings }: Log
     setState("loading");
     const redirectUrl = `${window.location.origin}/sso-callback?return_to=${encodeURIComponent(returnTo)}&flow=email_link&email=${encodeURIComponent(email)}`;
     try {
-      await signIn.create({ identifier: email, strategy: "email_link", redirectUrl });
+      // Resolves the identifier only — the actual send happens on /check-email via
+      // createEmailLinkFlow, which also polls for cross-device completion (AC-02b). Sending
+      // here too (via a strategy param) would fire a second, redundant email.
+      await signIn.create({ identifier: email });
       router.push(`/check-email?email=${encodeURIComponent(email)}&return_to=${encodeURIComponent(returnTo)}`);
       return;
     } catch (error) {

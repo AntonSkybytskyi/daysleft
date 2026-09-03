@@ -36,4 +36,14 @@ describe("MagicLinkInvalidScreen", () => {
     await userEvent.click(screen.getByRole("button", { name: "Send a new link" }));
     expect(onSendNewLink).toHaveBeenCalledOnce();
   });
+
+  it("verified-elsewhere: tells the truth (the link worked, on the other device) and offers no resend", () => {
+    render(<MagicLinkInvalidScreen state="verified-elsewhere" onSendNewLink={vi.fn()} />);
+
+    expect(screen.getByRole("status")).toHaveTextContent(/signed in on your other device/i);
+    // A resend here would create a NEW sign-in attempt that supersedes the one that just
+    // succeeded on the other device — offering it would let the Traveler destroy their own
+    // freshly-established session.
+    expect(screen.queryByRole("button", { name: "Send a new link" })).not.toBeInTheDocument();
+  });
 });

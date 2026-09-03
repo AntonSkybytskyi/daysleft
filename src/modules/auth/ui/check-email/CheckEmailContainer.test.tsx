@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { CheckEmailContainer } from "./CheckEmailContainer";
@@ -6,16 +6,30 @@ import { CheckEmailContainer } from "./CheckEmailContainer";
 const signInCreate = vi.fn();
 const signUpCreate = vi.fn();
 const signUpPrepareEmailAddressVerification = vi.fn();
+const setActive = vi.fn();
+const replace = vi.fn();
+
+// A plain, non-pollable signIn — matches most tests, which aren't exercising the mount-time
+// poll. Reassigned per test by the mount-time-poll describe block below.
+let signInValue: Record<string, unknown> = { create: signInCreate };
 
 vi.mock("@clerk/nextjs/legacy", () => ({
   useSignIn: () => ({
     isLoaded: true,
-    signIn: { create: signInCreate },
+    signIn: signInValue,
   }),
   useSignUp: () => ({
     isLoaded: true,
     signUp: { create: signUpCreate, prepareEmailAddressVerification: signUpPrepareEmailAddressVerification },
   }),
+}));
+
+vi.mock("@clerk/nextjs", () => ({
+  useClerk: () => ({ setActive }),
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace }),
 }));
 
 // isClerkAPIResponseError (from @clerk/nextjs/errors) checks target.constructor?.kind ===
@@ -33,21 +47,20 @@ describe("CheckEmailContainer", () => {
     signInCreate.mockReset();
     signUpCreate.mockReset();
     signUpPrepareEmailAddressVerification.mockReset();
+    setActive.mockReset();
+    replace.mockReset();
+    signInValue = { create: signInCreate };
   });
 
-  it("resends the magic link with the same return_to as the original send, and shows the confirmation", async () => {
+  it("resends the magic link and shows the confirmation", async () => {
     signInCreate.mockResolvedValue({});
     render(<CheckEmailContainer email="traveler@example.test" returnTo="/dashboard/trips/123" />);
 
     await userEvent.click(screen.getByRole("button", { name: "Resend" }));
 
-    expect(signInCreate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        identifier: "traveler@example.test",
-        strategy: "email_link",
-        redirectUrl: expect.stringMatching(/\/sso-callback\?.*return_to=%2Fdashboard%2Ftrips%2F123.*flow=email_link/),
-      }),
-    );
+    // The actual send now happens via startEmailLinkFlow (so the resent attempt is polled
+    // for cross-device completion too) — create() here only re-resolves the identifier.
+    expect(signInCreate).toHaveBeenCalledWith({ identifier: "traveler@example.test" });
     expect(await screen.findByText(/link resent/i)).toBeInTheDocument();
   });
 
@@ -83,5 +96,63 @@ describe("CheckEmailContainer", () => {
       expect.objectContaining({ strategy: "email_link" }),
     );
     expect(await screen.findByText(/link resent/i)).toBeInTheDocument();
+  });
+
+  describe("cross-device completion (AC-02b)", () => {
+    it("polls the pending sign-in attempt on mount and redirects to returnTo once it completes elsewhere", async () => {
+      const startEmailLinkFlow = vi.fn().mockResolvedValue({ status: "complete", createdSessionId: "sess_1" });
+      const cancelEmailLinkFlow = vi.fn();
+      signInValue = {
+        create: signInCreate,
+        status: "needs_first_factor",
+        supportedFirstFactors: [{ strategy: "email_link", emailAddressId: "idn_1" }],
+        createEmailLinkFlow: () => ({ startEmailLinkFlow, cancelEmailLinkFlow }),
+      };
+
+      render(<CheckEmailContainer email="traveler@example.test" returnTo="/dashboard/trips/123" />);
+
+      expect(startEmailLinkFlow).toHaveBeenCalledWith(
+        expect.objectContaining({ emailAddressId: "idn_1", redirectUrl: expect.stringContaining("/sso-callback") }),
+      );
+      await waitFor(() => expect(setActive).toHaveBeenCalledWith({ session: "sess_1" }));
+      expect(replace).toHaveBeenCalledWith("/dashboard/trips/123");
+    });
+
+    it("shows a visible error instead of waiting forever when the polled attempt doesn't complete", async () => {
+      const startEmailLinkFlow = vi.fn().mockResolvedValue({ status: "expired" });
+      signInValue = {
+        create: signInCreate,
+        status: "needs_first_factor",
+        supportedFirstFactors: [{ strategy: "email_link", emailAddressId: "idn_1" }],
+        createEmailLinkFlow: () => ({ startEmailLinkFlow, cancelEmailLinkFlow: vi.fn() }),
+      };
+
+      render(<CheckEmailContainer email="traveler@example.test" returnTo="/dashboard" />);
+
+      expect(await screen.findByRole("alert")).toBeInTheDocument();
+      expect(replace).not.toHaveBeenCalled();
+    });
+
+    it("cancels the poll on unmount instead of leaving it running", () => {
+      const cancelEmailLinkFlow = vi.fn();
+      signInValue = {
+        create: signInCreate,
+        status: "needs_first_factor",
+        supportedFirstFactors: [{ strategy: "email_link", emailAddressId: "idn_1" }],
+        createEmailLinkFlow: () => ({ startEmailLinkFlow: vi.fn().mockReturnValue(new Promise(() => {})), cancelEmailLinkFlow }),
+      };
+
+      const { unmount } = render(<CheckEmailContainer email="traveler@example.test" returnTo="/dashboard" />);
+      unmount();
+
+      expect(cancelEmailLinkFlow).toHaveBeenCalled();
+    });
+
+    it("does not poll when there is no pending sign-in attempt (e.g. this screen's mock doesn't support it)", () => {
+      render(<CheckEmailContainer email="traveler@example.test" returnTo="/dashboard" />);
+
+      expect(setActive).not.toHaveBeenCalled();
+      expect(replace).not.toHaveBeenCalled();
+    });
   });
 });

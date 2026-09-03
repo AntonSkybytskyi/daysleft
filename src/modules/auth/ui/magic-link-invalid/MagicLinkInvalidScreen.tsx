@@ -1,7 +1,12 @@
 import { Alert } from "@/modules/ui/Alert/Alert";
 import { Button } from "@/modules/ui/Button/Button";
 
-export type MagicLinkInvalidScreenState = "default" | "loading" | "error-rate-limited" | "error-sign-in-failed";
+export type MagicLinkInvalidScreenState =
+  | "default"
+  | "loading"
+  | "error-rate-limited"
+  | "error-sign-in-failed"
+  | "verified-elsewhere";
 
 export type MagicLinkInvalidScreenStrings = {
   heading: string;
@@ -9,6 +14,8 @@ export type MagicLinkInvalidScreenStrings = {
   sendNewLink: string;
   errorRateLimited: string;
   errorSignInFailed: string;
+  verifiedElsewhereHeading: string;
+  verifiedElsewhereBody: string;
 };
 
 const defaultStrings: MagicLinkInvalidScreenStrings = {
@@ -17,6 +24,8 @@ const defaultStrings: MagicLinkInvalidScreenStrings = {
   sendNewLink: "Send a new link",
   errorRateLimited: "Too many requests. Wait a bit before trying again.",
   errorSignInFailed: "Couldn't send a new link. Try again in a moment.",
+  verifiedElsewhereHeading: "You're signed in",
+  verifiedElsewhereBody: "This link was opened on another device. You're signed in on your other device — you can close this tab.",
 };
 
 export type MagicLinkInvalidScreenProps = {
@@ -27,6 +36,15 @@ export type MagicLinkInvalidScreenProps = {
 
 export function MagicLinkInvalidScreen({ state, onSendNewLink, strings }: MagicLinkInvalidScreenProps) {
   const t = { ...defaultStrings, ...strings };
+
+  if (state === "verified-elsewhere") {
+    return (
+      <div className="mx-auto flex max-w-sm flex-col gap-4 px-6 py-16">
+        <h1 className="text-lg font-semibold text-slate-900">{t.verifiedElsewhereHeading}</h1>
+        <Alert variant="success">{t.verifiedElsewhereBody}</Alert>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto flex max-w-sm flex-col gap-4 px-6 py-16">

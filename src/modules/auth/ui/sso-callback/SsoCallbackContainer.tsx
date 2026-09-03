@@ -40,11 +40,17 @@ function isInvalidEmailLink(error: unknown): boolean {
     return false;
   }
   const code = (error as { code?: string }).code;
-  return (
-    code === EmailLinkErrorCodeStatus.Expired ||
-    code === EmailLinkErrorCodeStatus.Failed ||
-    code === EmailLinkErrorCodeStatus.ClientMismatch
-  );
+  return code === EmailLinkErrorCodeStatus.Expired || code === EmailLinkErrorCodeStatus.Failed;
+}
+
+// ClientMismatch means the link WAS verified, just not by this browser — the originating
+// device (polling via startEmailLinkFlow on /check-email) is the one that completes the
+// sign-in. This is a success being reported here, not a failure.
+function isVerifiedElsewhereEmailLink(error: unknown): boolean {
+  if (!isEmailLinkError(error as Error)) {
+    return false;
+  }
+  return (error as { code?: string }).code === EmailLinkErrorCodeStatus.ClientMismatch;
 }
 
 function isRateLimited(error: unknown): boolean {
@@ -61,7 +67,7 @@ export function SsoCallbackContainer({ returnTo, flow = "oauth", email, deps, st
   const clerk = useClerk();
   const { signIn } = useSignIn();
   const { signUp } = useSignUp();
-  const [linkInvalid, setLinkInvalid] = useState(false);
+  const [screenState, setScreenState] = useState<"pending" | "invalid" | "verified-elsewhere">("pending");
   const [resendState, setResendState] = useState<"idle" | "loading" | "error-rate-limited" | "error-sign-in-failed">(
     "idle",
   );
@@ -74,11 +80,17 @@ export function SsoCallbackContainer({ returnTo, flow = "oauth", email, deps, st
       handleEmailLinkVerification({
         redirectUrlComplete: returnTo,
         // Fires when Clerk verified this link on a DIFFERENT browser/device than the one running
-        // this callback — this device never gets a session, so it must not navigate to returnTo.
-        onVerifiedOnOtherDevice: () => setLinkInvalid(true),
+        // this callback — the sign-in completes over there (the originating device polls for it
+        // via startEmailLinkFlow), not here, so this device must not navigate to returnTo, but it
+        // also must not claim the link was invalid: it worked, just not on this browser.
+        onVerifiedOnOtherDevice: () => setScreenState("verified-elsewhere"),
       }).catch((error) => {
+        if (isVerifiedElsewhereEmailLink(error)) {
+          setScreenState("verified-elsewhere");
+          return;
+        }
         if (isInvalidEmailLink(error)) {
-          setLinkInvalid(true);
+          setScreenState("invalid");
           return;
         }
         router.replace("/login?error=sign_in_failed");
@@ -101,7 +113,9 @@ export function SsoCallbackContainer({ returnTo, flow = "oauth", email, deps, st
       return;
     }
     setResendState("loading");
-    const sendMagicLink = deps?.sendMagicLink ?? ((opts) => signIn!.create({ ...opts, strategy: "email_link" }));
+    // Resolves the identifier only — the actual send happens on /check-email via
+    // createEmailLinkFlow, which also polls for cross-device completion (AC-02b).
+    const sendMagicLink = deps?.sendMagicLink ?? ((opts) => signIn!.create({ identifier: opts.identifier }));
     const redirectUrl = `${window.location.origin}/sso-callback?return_to=${encodeURIComponent(returnTo)}&flow=email_link&email=${encodeURIComponent(email)}`;
 
     const goToCheckEmail = () =>
@@ -128,7 +142,11 @@ export function SsoCallbackContainer({ returnTo, flow = "oauth", email, deps, st
     }
   };
 
-  if (linkInvalid) {
+  if (screenState === "verified-elsewhere") {
+    return <MagicLinkInvalidScreen state="verified-elsewhere" onSendNewLink={handleSendNewLink} strings={strings} />;
+  }
+
+  if (screenState === "invalid") {
     const state = resendState === "idle" ? "default" : resendState;
     return <MagicLinkInvalidScreen state={state} onSendNewLink={handleSendNewLink} strings={strings} />;
   }

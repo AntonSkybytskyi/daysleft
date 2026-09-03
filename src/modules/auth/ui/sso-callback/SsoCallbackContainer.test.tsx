@@ -106,7 +106,7 @@ describe("SsoCallbackContainer — email-link flow", () => {
     expect(await screen.findByText(/no longer valid/i)).toBeInTheDocument();
   });
 
-  it("renders SCR-04 (not a blind redirect) on a client_mismatch EmailLinkError — this device never gets a session", async () => {
+  it("renders the truthful verified-elsewhere state (not the invalid-link error, and no destructive resend) on a client_mismatch EmailLinkError — the sign-in succeeded on the other device", async () => {
     const handleEmailLinkVerification = vi
       .fn()
       .mockRejectedValue(emailLinkError(EmailLinkErrorCodeStatus.ClientMismatch));
@@ -118,7 +118,9 @@ describe("SsoCallbackContainer — email-link flow", () => {
       />,
     );
 
-    expect(await screen.findByText(/no longer valid/i)).toBeInTheDocument();
+    expect(await screen.findByText(/signed in on your other device/i)).toBeInTheDocument();
+    expect(screen.queryByText(/no longer valid/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /send a new link/i })).not.toBeInTheDocument();
     expect(replace).not.toHaveBeenCalled();
   });
 
@@ -246,7 +248,7 @@ describe("SsoCallbackContainer — email-link flow", () => {
     expect(await screen.findByText(/too many requests/i)).toBeInTheDocument();
   });
 
-  it("renders SCR-04 (not a blind redirect to returnTo) when onVerifiedOnOtherDevice fires — per Clerk's own contract this callback means verification happened on ANOTHER device, so this browser has no session of its own", async () => {
+  it("renders the truthful verified-elsewhere state (not a blind redirect to returnTo, and not the invalid-link error) when onVerifiedOnOtherDevice fires — per Clerk's own contract this callback means verification succeeded on ANOTHER device, so this browser has no session of its own but the sign-in did work", async () => {
     let capturedOpts: { onVerifiedOnOtherDevice?: () => void } = {};
     const handleEmailLinkVerification = vi.fn().mockImplementation((opts) => {
       capturedOpts = opts;
@@ -262,7 +264,9 @@ describe("SsoCallbackContainer — email-link flow", () => {
 
     capturedOpts.onVerifiedOnOtherDevice?.();
 
-    expect(await screen.findByText(/no longer valid/i)).toBeInTheDocument();
+    expect(await screen.findByText(/signed in on your other device/i)).toBeInTheDocument();
+    expect(screen.queryByText(/no longer valid/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /send a new link/i })).not.toBeInTheDocument();
     expect(replace).not.toHaveBeenCalled();
   });
 });

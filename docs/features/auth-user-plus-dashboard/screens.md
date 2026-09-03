@@ -90,11 +90,11 @@ updated_at: "2026-09-03"
 
 | State | Trigger / condition | Components (from the inventory) | Source-ref |
 |---|---|---|---|
-| default | Magic-link email submitted on SCR-01; confirms it was sent, offers resend | `Alert` (info), `LinkButton` ("Resend") | wireframe below |
+| default | Magic-link email submitted on SCR-01; confirms it was sent, offers resend. Silently long-polls the sign-in attempt in the background (Clerk `createEmailLinkFlow`/`startEmailLinkFlow`) so that opening the link on a DIFFERENT device completes the sign-in and navigates THIS device straight to the dashboard, per AC-02b — no separate visible state, since success just navigates away | `Alert` (info), `LinkButton` ("Resend") | wireframe below |
 | loading | Resend requested, in flight | `LinkButton` (loading), `Spinner` | wireframe below |
 | resent-confirmation | Resend succeeded | `Alert` (success) | wireframe below |
 | error-rate-limited | Magic-link send rate exceeded (spec §6 NFR ≤5/email/hour, sad.md §8 risk) | `Alert` (error) | wireframe below |
-| error-sign-in-failed | Resend failed for a reason other than rate-limiting (AC-02) | `Alert` (error), `LinkButton` ("Resend") | wireframe below |
+| error-sign-in-failed | Resend failed for a reason other than rate-limiting, OR the background poll resolved without completing (e.g. expired) (AC-02) | `Alert` (error), `LinkButton` ("Resend") | wireframe below |
 | empty | N/A — this screen always shows the confirmation content; no data-driven empty case | — |
 
 ```text
@@ -173,6 +173,7 @@ updated_at: "2026-09-03"
 | loading | New-link request in flight | `Button` (loading), `Spinner` | wireframe below |
 | error-rate-limited | Same magic-link send NFR as SCR-02 (spec §6, sad.md §8) | `Alert` (error) | wireframe below |
 | error-sign-in-failed | Resend failed for a reason other than rate-limiting or the sign-up fallback (AC-02) | `Alert` (error), `Button` ("Send a new link") | wireframe below |
+| verified-elsewhere | Clerk reports the link was verified on a DIFFERENT device than this one (`onVerifiedOnOtherDevice` / `client_mismatch`) — the sign-in succeeds over there, not here, per AC-02b; no resend offered, since one would create a new attempt that supersedes the session just established on the other device | `Alert` (success) | wireframe below |
 | empty | N/A — this screen always shows the invalid-link message; no data-driven empty case | — |
 
 ```text
