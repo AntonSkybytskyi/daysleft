@@ -14,6 +14,16 @@ function baseProps() {
 }
 
 describe("LoginScreen", () => {
+  it("renders the default English heading when none is given", () => {
+    render(<LoginScreen state="default" {...baseProps()} />);
+    expect(screen.getByRole("heading", { name: "Sign in to daysleft" })).toBeInTheDocument();
+  });
+
+  it("renders a supplied heading (e.g. resolved via translate() at the page level)", () => {
+    render(<LoginScreen state="default" heading="Custom heading" {...baseProps()} />);
+    expect(screen.getByRole("heading", { name: "Custom heading" })).toBeInTheDocument();
+  });
+
   it("default: offers Google, GitHub and magic-link email sign-in", async () => {
     const props = baseProps();
     render(<LoginScreen state="default" {...props} />);

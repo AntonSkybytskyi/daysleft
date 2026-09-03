@@ -18,6 +18,7 @@ export type LoginScreenProps = {
   onGithubClick: () => void;
   onSendMagicLink: () => void;
   loadingProvider?: "google" | "github" | "email";
+  heading?: string;
 };
 
 export function LoginScreen({
@@ -28,12 +29,13 @@ export function LoginScreen({
   onGithubClick,
   onSendMagicLink,
   loadingProvider,
+  heading = "Sign in to daysleft",
 }: LoginScreenProps) {
   const showEmailField = state !== "error-email-required";
 
   return (
     <div className="mx-auto flex max-w-sm flex-col gap-4 px-6 py-16">
-      <h1 className="text-lg font-semibold text-slate-900">daysleft</h1>
+      <h1 className="text-lg font-semibold text-slate-900">{heading}</h1>
 
       {state === "error-sign-in-failed" && (
         <Alert variant="error">Sign-in didn&apos;t complete. Try again with any method below.</Alert>
