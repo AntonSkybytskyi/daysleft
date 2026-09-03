@@ -53,7 +53,7 @@
 | T44 | Handle the logout response instead of always redirecting | ui | Frontend Lead | S | — | done |
 | T45 | Fix db:down to actually remove the migration's journal row | migration | Backend Lead | S | — | done |
 | T46 | Distinct error code for the session-side email-conflict case | app | Backend Lead | S | — | done |
-| T47 | Wire Clerk testing-token harness for e2e scenario 3 | tests | Frontend Lead | M | T38 | todo |
+| T47 | Wire Clerk testing-token harness for e2e scenario 3 | tests | Frontend Lead | M | T38 | done (fallback taken — no live Clerk test instance/CI secrets in this environment; scenario's unreachable second half removed, AC-01/AC-07 e2e coverage recorded as explicitly absent, not claimed — see e2e/auth-dashboard.spec.ts) |
 | T48 | Fix CheckEmailContainer resend (return_to, sign-up fallback, error labeling) | ui | Frontend Lead | M | T38 | todo |
 | T49 | Make SCR-04 "send new link" actually resend | ui | Frontend Lead | S | T38 | todo |
 | T50 | Key memoized DB client by connection string | infra | Backend Lead | S | — | done |
