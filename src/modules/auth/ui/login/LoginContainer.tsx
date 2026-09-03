@@ -1,6 +1,6 @@
 "use client";
 
-import { useSignIn } from "@clerk/nextjs/legacy";
+import { useSignIn, useSignUp } from "@clerk/nextjs/legacy";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { LoginScreen, type LoginScreenState, type LoginScreenStrings } from "./LoginScreen";
@@ -12,8 +12,14 @@ export type LoginContainerProps = {
   strings?: Partial<LoginScreenStrings>;
 };
 
+function isFormIdentifierNotFound(error: unknown): boolean {
+  const errors = (error as { errors?: { code?: string }[] } | undefined)?.errors;
+  return Boolean(errors?.some((entry) => entry.code === "form_identifier_not_found"));
+}
+
 export function LoginContainer({ heading, returnTo, initialState, strings }: LoginContainerProps) {
   const { signIn, isLoaded } = useSignIn();
+  const { signUp, isLoaded: isSignUpLoaded } = useSignUp();
   const router = useRouter();
   const [state, setState] = useState<LoginScreenState>(initialState);
   const [loadingProvider, setLoadingProvider] = useState<"google" | "github" | "email">();
@@ -42,12 +48,21 @@ export function LoginContainer({ heading, returnTo, initialState, strings }: Log
     }
     setLoadingProvider("email");
     setState("loading");
+    const redirectUrl = `${window.location.origin}/sso-callback`;
     try {
-      await signIn.create({
-        identifier: email,
-        strategy: "email_link",
-        redirectUrl: `${window.location.origin}/sso-callback`,
-      });
+      await signIn.create({ identifier: email, strategy: "email_link", redirectUrl });
+      router.push(`/check-email?email=${encodeURIComponent(email)}`);
+      return;
+    } catch (error) {
+      if (!isFormIdentifierNotFound(error) || !isSignUpLoaded) {
+        setState("error-sign-in-failed");
+        return;
+      }
+    }
+
+    try {
+      await signUp.create({ emailAddress: email });
+      await signUp.prepareEmailAddressVerification({ strategy: "email_link", redirectUrl });
       router.push(`/check-email?email=${encodeURIComponent(email)}`);
     } catch {
       setState("error-sign-in-failed");
