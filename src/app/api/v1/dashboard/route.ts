@@ -3,11 +3,18 @@ import { createDbClient } from "@/db/client";
 import { buildSessionDeps } from "@/modules/auth/infra/session-deps";
 import { getDashboard } from "@/modules/dashboard/app/get-dashboard";
 import { resolveReturnTo } from "@/modules/dashboard/app/return-to";
+import { mapUnknownError, toErrorEnvelope } from "@/lib/errors";
 
 export async function GET(request: NextRequest) {
-  const db = createDbClient(process.env.DATABASE_URL ?? "");
-  const rawPath = request.nextUrl.searchParams.get("path");
-  const requestedPath = rawPath ? resolveReturnTo(rawPath, request.nextUrl.origin) : undefined;
-  const result = await getDashboard(buildSessionDeps(db), requestedPath);
-  return NextResponse.json(result.body, { status: result.status });
+  try {
+    const db = createDbClient(process.env.DATABASE_URL ?? "");
+    const rawPath = request.nextUrl.searchParams.get("path");
+    const requestedPath = rawPath ? resolveReturnTo(rawPath, request.nextUrl.origin) : undefined;
+    const result = await getDashboard(buildSessionDeps(db), requestedPath);
+    const body = result.status === 200 ? result.body : toErrorEnvelope(result.body);
+    return NextResponse.json(body, { status: result.status });
+  } catch (error) {
+    const { status, body } = mapUnknownError(error);
+    return NextResponse.json(body, { status });
+  }
 }

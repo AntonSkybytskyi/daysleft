@@ -32,7 +32,9 @@ describe("DashboardContainer", () => {
       "fetch",
       vi.fn().mockResolvedValue({
         status: 401,
-        json: async () => ({ code: "auth.session_invalid", details: { return_to: "/dashboard/trips/123" } }),
+        json: async () => ({
+          error: { code: "auth.session_invalid", details: { return_to: "/dashboard/trips/123" } },
+        }),
       }),
     );
 
@@ -54,7 +56,7 @@ describe("DashboardContainer", () => {
   it("redirects to /login?error=email_required when the dashboard fetch returns 401 auth.email_required", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({ status: 401, json: async () => ({ code: "auth.email_required" }) }),
+      vi.fn().mockResolvedValue({ status: 401, json: async () => ({ error: { code: "auth.email_required" } }) }),
     );
 
     render(<DashboardContainer />);

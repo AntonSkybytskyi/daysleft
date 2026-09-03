@@ -69,8 +69,9 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
               example:
-                code: "auth.webhook_invalid_signature"
-                message: "Webhook signature verification failed."
+                error:
+                  code: "auth.webhook_invalid_signature"
+                  message: "Webhook signature verification failed."
         "422":
           description: |
             account creation/linking blocked — either no verified email in the payload
@@ -82,12 +83,14 @@ paths:
               examples:
                 emailRequired:
                   value:
-                    code: "auth.email_required"
-                    message: "A verified email is required to create or link an account."
+                    error:
+                      code: "auth.email_required"
+                      message: "A verified email is required to create or link an account."
                 emailConflict:
                   value:
-                    code: "auth.email_conflict"
-                    message: "That email is already linked to a different account."
+                    error:
+                      code: "auth.email_conflict"
+                      message: "That email is already linked to a different account."
 
   /api/v1/dashboard:
     get:
@@ -113,10 +116,11 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
               example:
-                code: "auth.session_invalid"
-                message: "Sign in to view your dashboard."
-                details:
-                  return_to: "/dashboard"
+                error:
+                  code: "auth.session_invalid"
+                  message: "Sign in to view your dashboard."
+                  details:
+                    return_to: "/dashboard"
 
   /api/v1/auth/logout:
     post:
@@ -133,8 +137,9 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
               example:
-                code: "auth.session_invalid"
-                message: "No active session."
+                error:
+                  code: "auth.session_invalid"
+                  message: "No active session."
 
 components:
   securitySchemes:
@@ -162,6 +167,16 @@ components:
 
   schemas:
     Error:
+      description: |
+        The unified error envelope every API/webhook route returns for a non-2xx response
+        (CLAUDE.md — Conventions: Error handling).
+      type: object
+      required: [error]
+      additionalProperties: false
+      properties:
+        error: { $ref: "#/components/schemas/ErrorBody" }
+
+    ErrorBody:
       type: object
       required: [code, message]
       additionalProperties: false

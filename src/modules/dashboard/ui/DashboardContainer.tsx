@@ -23,11 +23,11 @@ export function DashboardContainer({ strings }: DashboardContainerProps = {}) {
           return;
         }
         if (response.status === 401) {
-          const body = await response.json();
+          const { error } = await response.json();
           const loginUrl =
-            body.code === "auth.email_required"
+            error?.code === "auth.email_required"
               ? "/login?error=email_required"
-              : `/login?return_to=${encodeURIComponent(body.details?.return_to ?? path)}`;
+              : `/login?return_to=${encodeURIComponent(error?.details?.return_to ?? path)}`;
           router.replace(loginUrl);
           return;
         }
