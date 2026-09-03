@@ -903,18 +903,23 @@
     },
     {
       "id": "T60",
-      "title": "Actually deliver AC-02b's outcome for cross-device magic-link verification",
+      "title": "Actually deliver AC-02b's outcome via originating-device polling (decision: keep AC-02b as written)",
       "layer": "ui",
       "deps": [],
       "acs": [
         "AC-02b"
       ],
-      "dod": "opening a magic link on a different device than the one that requested it signs the user in and shows the dashboard on that device; onVerifiedOnOtherDevice and ClientMismatch each render a state distinct from the generic 'link no longer valid' error and neither offers a 'send new link' CTA that would supersede the session just established elsewhere; screens.md documents the new state(s); test asserts a session is actually established (or, for ClientMismatch, that no destructive resend is offered), not just that a particular screen renders",
+      "dod": "round-4 review resolved the AC-02b fork as (a) poll + complete on the originating device, keeping AC-02b's current wording. CheckEmailContainer/the /check-email page uses Clerk's signIn.createEmailLinkFlow()/startEmailLinkFlow() (or equivalent) to long-poll the sign-in attempt it created, so opening the link on a second device completes the sign-in and navigates the ORIGINATING device to the dashboard (or validated return_to) once Clerk reports verified; the second device (where onVerifiedOnOtherDevice/ClientMismatch fire) renders a distinct, truthful state — e.g. 'verified-on-other-device', 'you're signed in on your other device' — with no 'send new link' CTA that could supersede the completing attempt; screens.md documents the new SCR-02 (polling/verified) and SCR-04 (verified-on-other-device) states; ADR-0001's Consequences section gains a note on the email-link cross-device model; test-plan.md:36 gets a real (not just planned) e2e scenario for AC-02b, and e2e/auth-dashboard.spec.ts adds it (or an explicitly-named skip if a live Clerk instance still isn't available, per the existing T47 pattern — never silently green); SsoCallbackContainer.test.tsx:109-123,249-267 are rewritten to assert the new decided outcome, not the previous deviation",
       "files_hint": [
+        "src/modules/auth/ui/check-email/CheckEmailContainer.tsx",
+        "src/app/check-email/page.tsx",
         "src/modules/auth/ui/sso-callback/SsoCallbackContainer.tsx",
         "src/modules/auth/ui/sso-callback/SsoCallbackContainer.test.tsx",
         "src/modules/auth/ui/magic-link-invalid/MagicLinkInvalidScreen.tsx",
-        "docs/features/auth-user-plus-dashboard/screens.md"
+        "docs/features/auth-user-plus-dashboard/screens.md",
+        "docs/features/auth-user-plus-dashboard/test-plan.md",
+        "docs/features/auth-user-plus-dashboard/adr/0001-use-clerk-for-passwordless-auth.md",
+        "e2e/auth-dashboard.spec.ts"
       ]
     },
     {
@@ -946,6 +951,35 @@
         "src/modules/auth/app/session.ts",
         "src/modules/auth/infra/linked-identities-repository.ts",
         "src/modules/auth/infra/routes/clerk-webhook.ts"
+      ]
+    },
+    {
+      "id": "T63",
+      "title": "Join-test AC-03's linked-banner wire from the dashboard API response to the rendered banner",
+      "layer": "tests",
+      "deps": [],
+      "acs": [
+        "AC-03"
+      ],
+      "dod": "at least one DashboardContainer test's fetch fixture sets linked:true in the response body and asserts the 'signed in to your existing account' banner text renders, so a rename or a dropped linked prop between DashboardContainer.tsx:39 and :72 fails the test instead of staying green",
+      "files_hint": [
+        "src/modules/dashboard/ui/DashboardContainer.tsx",
+        "src/modules/dashboard/ui/DashboardContainer.test.tsx"
+      ]
+    },
+    {
+      "id": "T64",
+      "title": "Fix screens.md's AC-02b mis-citation and re-parameterize migrate-down's journal DELETE",
+      "layer": "docs",
+      "deps": [],
+      "acs": [
+        "AC-02"
+      ],
+      "dod": "screens.md:97's SCR-02 error-sign-in-failed row cites AC-02 (resend failure), not AC-02b, matching the parallel SCR-04 row; scripts/migrate-down.ts's deleteJournalRowSql no longer string-interpolates created_at into the SQL text — either the executor takes a parameterized query (sql, params) so both the CLI and the test keep a parameterized DELETE, or resolveRevertTarget guards Number.isFinite(last.when) before building the statement",
+      "files_hint": [
+        "docs/features/auth-user-plus-dashboard/screens.md",
+        "scripts/migrate-down.ts",
+        "tests/integration/migrations/migrate-down.test.ts"
       ]
     }
   ]

@@ -68,8 +68,10 @@
 | T58 | Distinct error message for failed logout | ui | Frontend Lead | S | — | done |
 | T59 | migrate-down test exercises the real script | tests | Backend Lead | S | — | done |
 
-| T60 | Actually deliver AC-02b's outcome for cross-device magic-link verify | ui | Frontend Lead | M | — | todo |
+| T60 | Deliver AC-02b via originating-device polling (decision: keep AC-02b as written) | ui | Frontend Lead | L | — | todo |
 | T61 | Stop logout retry loop when signOut() rejects after server 204 | app | Frontend Lead | S | — | todo |
 | T62 | Re-validate/invalidate persisted linked-identity mappings | data | Backend Lead | M | T55 | todo |
+| T63 | Join-test AC-03's linked-banner wire (API response → rendered banner) | tests | Frontend Lead | S | — | todo |
+| T64 | Fix screens.md AC-02b mis-citation + re-parameterize migrate-down journal DELETE | docs | Backend Lead | S | — | todo |
 
-**Total:** 62 tasks (17 original + 20 review-2026-09-03 follow-ups + 15 review-2026-09-03-2 follow-ups + 7 review-2026-09-03-3 follow-ups + 3 review-2026-09-03-4 follow-ups); 59 done, 3 todo.
+**Total:** 64 tasks (17 original + 20 review-2026-09-03 follow-ups + 15 review-2026-09-03-2 follow-ups + 7 review-2026-09-03-3 follow-ups + 5 review-2026-09-03-4 follow-ups); 59 done, 5 todo.
