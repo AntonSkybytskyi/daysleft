@@ -34,6 +34,20 @@ export function resolveRevertTarget(migrationsDir: string): RevertTarget | null 
   return { tag: last.tag, downSql: readFileSync(downPath, "utf-8"), journalWhen: last.when };
 }
 
+// Matches the real table drizzle-orm's postgres-js migrate() writes to (schema "drizzle", table
+// "__drizzle_migrations") and the real key it writes (created_at, from the journal entry's
+// `when`) — verified against drizzle-orm's own pg-core/dialect.js and migrator.js. `createdAt`
+// is a trusted internal journal timestamp (never user input), so plain interpolation is fine —
+// this stays a single exec() call so both the CLI and the test run the exact same SQL text.
+export function deleteJournalRowSql(createdAt: number): string {
+  return `delete from "drizzle"."__drizzle_migrations" where created_at = ${createdAt}`;
+}
+
+export async function applyRevert(target: RevertTarget, exec: (sql: string) => Promise<unknown>): Promise<void> {
+  await exec(target.downSql);
+  await exec(deleteJournalRowSql(target.journalWhen));
+}
+
 async function main() {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
@@ -48,11 +62,7 @@ async function main() {
 
   const client = postgres(connectionString, { max: 1 });
   try {
-    await client.unsafe(target.downSql);
-    // Matches the real table drizzle-orm's postgres-js migrate() writes to (schema "drizzle",
-    // table "__drizzle_migrations") and the real key it writes (created_at, from the journal
-    // entry's `when`) — verified against drizzle-orm's own pg-core/dialect.js and migrator.js.
-    await client`delete from "drizzle"."__drizzle_migrations" where created_at = ${target.journalWhen}`;
+    await applyRevert(target, (sql) => client.unsafe(sql));
     console.log(`Reverted ${target.tag}.`);
   } finally {
     await client.end();

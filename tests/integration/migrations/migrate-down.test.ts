@@ -2,7 +2,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { resolveRevertTarget } from "../../../scripts/migrate-down";
+import { applyRevert, resolveRevertTarget } from "../../../scripts/migrate-down";
 
 const migrationsDir = path.resolve(__dirname, "../../../drizzle");
 
@@ -92,9 +92,10 @@ describe("migrate-down round trip (up -> down -> up)", () => {
     expect(await tableExists(table)).toBe(true);
     const rowCountAfterUp = await journalRowCount();
 
-    // --- down (this is the fix under test: the real bug left the journal row in place) ---
-    await client.exec(target.downSql);
-    await client.query(`DELETE FROM "drizzle"."__drizzle_migrations" WHERE created_at = $1`, [target.journalWhen]);
+    // --- down: drives the actual script's applyRevert with its actual deleteJournalRowSql text
+    // (not a re-implementation of it), so a regression in scripts/migrate-down.ts's table/key
+    // would fail this test.
+    await applyRevert(target, (sql) => client.exec(sql));
 
     expect(await tableExists(table)).toBe(false);
     expect(await journalRowCount()).toBe(rowCountAfterUp - 1);
