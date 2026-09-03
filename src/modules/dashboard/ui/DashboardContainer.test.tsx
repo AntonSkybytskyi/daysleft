@@ -178,6 +178,43 @@ describe("DashboardContainer", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it("retries clerk.signOut() itself (not the server logout call) when it rejects, so no live client session survives a transient blip", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ status: 200, json: async () => ({ user: { id: "u1", email: "a@b.com" }, has_trips: false }) })
+      .mockResolvedValueOnce({ status: 204 });
+    vi.stubGlobal("fetch", fetchMock);
+    signOut.mockRejectedValueOnce(new Error("network blip")).mockResolvedValueOnce(undefined);
+
+    render(<DashboardContainer />);
+    await waitFor(() => expect(screen.getByText(/nothing tracked yet/i)).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole("button", { name: "Log out" }));
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/login"));
+    expect(signOut).toHaveBeenCalledTimes(2);
+    // The server logout endpoint is never re-POSTed — only the client-side signOut retries.
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("gives up retrying clerk.signOut() after a bounded number of attempts and still redirects, since the server already revoked the session", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ status: 200, json: async () => ({ user: { id: "u1", email: "a@b.com" }, has_trips: false }) })
+      .mockResolvedValueOnce({ status: 204 });
+    vi.stubGlobal("fetch", fetchMock);
+    signOut.mockRejectedValue(new Error("network down"));
+
+    render(<DashboardContainer />);
+    await waitFor(() => expect(screen.getByText(/nothing tracked yet/i)).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole("button", { name: "Log out" }));
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/login"));
+    expect(signOut.mock.calls.length).toBeGreaterThan(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("shows a logout-specific error (not the dashboard-fetch one) instead of redirecting when the logout request rejects (network failure)", async () => {
     const fetchMock = vi
       .fn()

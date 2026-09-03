@@ -67,12 +67,18 @@ export function DashboardContainer({ strings }: DashboardContainerProps = {}) {
       setStatus("error-logout-failed");
       return;
     }
-    try {
-      await clerk.signOut();
-    } catch {
-      // The server already revoked the session — that's authoritative. Retrying would
-      // only re-POST a logout that now 401s, trapping the user behind an error that can
-      // never resolve while they still hold a stale client JWT.
+    // The server already revoked the session — that's authoritative, so a rejection here
+    // never re-POSTs the logout endpoint (it now 401s with no server session left). Instead
+    // retry signOut() itself a bounded number of times, so a transient client-side blip
+    // doesn't leave a live Clerk session behind after we tell the user they're signed out.
+    const maxSignOutAttempts = 3;
+    for (let attempt = 1; attempt <= maxSignOutAttempts; attempt += 1) {
+      try {
+        await clerk.signOut();
+        break;
+      } catch {
+        // retry, up to maxSignOutAttempts
+      }
     }
     router.replace("/login");
   };

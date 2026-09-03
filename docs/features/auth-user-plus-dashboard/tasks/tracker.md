@@ -74,13 +74,13 @@
 | T63 | Join-test AC-03's linked-banner wire (API response → rendered banner) | tests | Frontend Lead | S | — | done |
 | T64 | Fix screens.md AC-02b mis-citation + guard migrate-down journal DELETE's `when` (Number.isFinite guard, not re-parameterization — see round-4 review) | docs | Backend Lead | S | — | done |
 
-| T65 | Amend spec/SAD/UX-flows to state AC-02b's originating-device outcome | docs | Backend Lead | S | — | todo |
+| T65 | Amend spec/SAD/UX-flows to state AC-02b's originating-device outcome | docs | Backend Lead | S | — | done |
 | T66 | Surface visible error instead of silent no-op when /check-email send guard fails | ui | Frontend Lead | S | T60 | todo |
 | T67 | Non-destructive recovery CTA for sign-up branch's verified-elsewhere screen | ui | Frontend Lead | S | T60 | todo |
 | T68 | Scope linked-identity invalidation to email changes + cover canonical-account side | data | Backend Lead | M | T62 | todo |
 | T69 | Guard /check-email poll against cancellation/unmount races and remount re-sends | ui | Frontend Lead | M | T60 | todo |
 | T70 | Fix CheckEmailContainer tests to match real Clerk SignInStatus contract + test single-send | tests | Frontend Lead | S | T60 | todo |
-| T71 | Retry/force-clear client session when signOut() rejects after server 204 | app | Frontend Lead | S | T61 | todo |
+| T71 | Retry/force-clear client session when signOut() rejects after server 204 | app | Frontend Lead | S | T61 | done |
 | T72 | Wire verified-elsewhere screen strings through i18n catalog | ui | Frontend Lead | S | T60 | todo |
 | T73 | Clean up dead resend CTA wiring, redundant Clerk import, optional invalidation dependency | docs | Backend Lead | S | T60, T62, T67 | todo |
 
