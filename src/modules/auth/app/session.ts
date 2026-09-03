@@ -2,7 +2,7 @@ import { resolveAccountLinking } from "./account-linking";
 import type { User, UsersRepository } from "../infra/users-repository";
 
 export type SessionResult =
-  | { authenticated: true; user: User }
+  | { authenticated: true; user: User; linked?: boolean }
   | { authenticated: false; reason?: "email_required" };
 
 export type SessionDeps = {
@@ -40,5 +40,5 @@ export async function getSessionUser(deps: SessionDeps): Promise<SessionResult> 
     return { authenticated: false };
   }
 
-  return { authenticated: true, user: result.user };
+  return { authenticated: true, user: result.user, linked: matchedByEmail !== null };
 }

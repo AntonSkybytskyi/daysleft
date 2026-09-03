@@ -21,7 +21,7 @@ describe("getDashboard", () => {
 
     expect(result).toEqual({
       status: 200,
-      body: { user: { id: "user_1", email: "traveler@example.test" }, has_trips: false },
+      body: { user: { id: "user_1", email: "traveler@example.test" }, has_trips: false, linked: false },
     });
   });
 

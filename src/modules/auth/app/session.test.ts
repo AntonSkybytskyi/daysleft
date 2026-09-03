@@ -52,8 +52,26 @@ describe("getSessionUser", () => {
 
     const result = await getSessionUser(deps);
 
-    expect(result).toEqual({ authenticated: true, user: createdUser });
+    expect(result).toEqual({ authenticated: true, user: createdUser, linked: false });
     expect(repository.upsertById).toHaveBeenCalledWith({ id: "user_1", email: "traveler@example.test" });
+  });
+
+  it("marks the session linked when the create-or-fetch fallback matches an existing account by email", async () => {
+    const existingByEmail = { id: "user_via_google", email: "traveler@example.test", createdAt: new Date(), updatedAt: new Date() };
+    const repository = fakeRepository({
+      findById: vi.fn().mockResolvedValue(null),
+      findByEmail: vi.fn().mockResolvedValue(existingByEmail),
+      upsertById: vi.fn().mockResolvedValue({ kind: "ok", user: existingByEmail }),
+    });
+    const deps: SessionDeps = {
+      getAuthUserId: vi.fn().mockResolvedValue("user_via_magic_link"),
+      repository,
+      fetchClerkUser: vi.fn().mockResolvedValue({ id: "user_via_magic_link", verifiedEmail: "traveler@example.test" }),
+    };
+
+    const result = await getSessionUser(deps);
+
+    expect(result).toEqual({ authenticated: true, user: existingByEmail, linked: true });
   });
 
   it("resolves to unauthenticated with no data leaked when Clerk has no verified email for this user", async () => {

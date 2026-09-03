@@ -4,7 +4,7 @@ import { errorBody } from "@/lib/errors";
 export const DASHBOARD_PATH = "/dashboard";
 
 export type DashboardResult =
-  | { status: 200; body: { user: { id: string; email: string }; has_trips: false } }
+  | { status: 200; body: { user: { id: string; email: string }; has_trips: false; linked: boolean } }
   | { status: 401; body: ReturnType<typeof errorBody> };
 
 export async function getDashboard(sessionDeps: SessionDeps): Promise<DashboardResult> {
@@ -35,6 +35,7 @@ export async function getDashboard(sessionDeps: SessionDeps): Promise<DashboardR
     body: {
       user: { id: session.user.id, email: session.user.email },
       has_trips: false,
+      linked: session.linked ?? false,
     },
   };
 }

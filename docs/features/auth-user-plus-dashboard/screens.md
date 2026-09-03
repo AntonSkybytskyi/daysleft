@@ -116,6 +116,7 @@ updated_at: "2026-09-03"
 |---|---|---|---|
 | loading | `getDashboard` request in flight | `Spinner` | wireframe below |
 | default / empty | No trips recorded (AC-07); `has_trips: false` is hardcoded in this slice (spec §3 non-goal — no `trips` table yet) | `Header` (with logout), `EmptyState` | wireframe below |
+| linked-account | AC-03: this session's create-or-fetch fallback matched an existing account by verified email (`GET /api/v1/dashboard`'s `linked: true`) | `Header`, `Alert` (success), `EmptyState` | wireframe below |
 | error | N/A — a 401 (`auth.session_invalid`) redirects to SCR-01 (`redirected-sign-in-required`) rather than rendering an in-place error; no 5xx branch exists anywhere upstream (sad.md §6, spec §5, or the contract) | — | — |
 
 ```text

@@ -21,4 +21,16 @@ describe("DashboardScreen", () => {
     await userEvent.click(screen.getByRole("button", { name: "Log out" }));
     expect(onLogout).toHaveBeenCalledOnce();
   });
+
+  it("linked-account: tells the Traveler they signed in to their existing account", () => {
+    render(<DashboardScreen state="default" onLogout={vi.fn()} linked />);
+
+    expect(screen.getByText(/signed in to your existing account/i)).toBeInTheDocument();
+  });
+
+  it("does not show the linked-account message for a fresh account", () => {
+    render(<DashboardScreen state="default" onLogout={vi.fn()} />);
+
+    expect(screen.queryByText(/signed in to your existing account/i)).not.toBeInTheDocument();
+  });
 });

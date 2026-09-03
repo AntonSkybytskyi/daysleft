@@ -7,6 +7,7 @@ import { DashboardScreen } from "./DashboardScreen";
 export function DashboardContainer() {
   const router = useRouter();
   const [loaded, setLoaded] = useState(false);
+  const [linked, setLinked] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -20,18 +21,23 @@ export function DashboardContainer() {
         router.replace(body.code === "auth.email_required" ? "/login?error=email_required" : "/login");
         return;
       }
+      const body = await response.json();
+      setLinked(Boolean(body.linked));
       setLoaded(true);
     });
 
     return () => {
       cancelled = true;
     };
-  }, [router]);
+    // Fetch once on mount — re-running on every router identity change would
+    // re-issue the request and re-consume the 401/200 response body.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleLogout = async () => {
     await fetch("/api/v1/auth/logout", { method: "POST" });
     router.replace("/login");
   };
 
-  return <DashboardScreen state={loaded ? "default" : "loading"} onLogout={handleLogout} />;
+  return <DashboardScreen state={loaded ? "default" : "loading"} onLogout={handleLogout} linked={linked} />;
 }
