@@ -57,7 +57,7 @@
 | T48 | Fix CheckEmailContainer resend (return_to, sign-up fallback, error labeling) | ui | Frontend Lead | M | T38 | todo |
 | T49 | Make SCR-04 "send new link" actually resend | ui | Frontend Lead | S | T38 | todo |
 | T50 | Key memoized DB client by connection string | infra | Backend Lead | S | — | done |
-| T51 | Add SCR-03 fetch-failure error state to screens.md | docs | Frontend Lead | S | — | todo |
+| T51 | Add SCR-03 fetch-failure error state to screens.md | docs | Frontend Lead | S | — | done |
 | T52 | Verify Clerk middleware coverage for /sso-callback + /check-email | wiring | Backend Lead | S | — | todo |
 
 **Total:** 52 tasks (17 original + 20 review-2026-09-03 follow-ups + 15 review-2026-09-03-2 follow-ups); 37 done, 15 todo, ~9 + ~7 + ~6 person-days.
