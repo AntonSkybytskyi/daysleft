@@ -1,0 +1,20 @@
+{
+  "login.heading": "Sign in to daysleft",
+  "login.continueWithGoogle": "Continue with Google",
+  "login.continueWithGithub": "Continue with GitHub",
+  "login.emailPlaceholder": "you@example.com",
+  "login.sendMagicLink": "Send magic link",
+  "login.errorSignInFailed": "Sign-in didn't complete. Try again with any method below.",
+  "login.errorEmailRequired": "Your provider didn't share a verified email. Make one visible or verified, then try again.",
+  "login.redirectedSignInRequired": "Sign in to continue.",
+  "checkEmail.heading": "Check your email",
+  "checkEmail.body": "We sent a magic link to sign you in. Click it to continue.",
+  "checkEmail.resend": "Resend",
+  "checkEmail.errorRateLimited": "Too many requests. Wait a bit before trying again.",
+  "magicLinkInvalid.heading": "This link is no longer valid",
+  "magicLinkInvalid.body": "It may have expired, already been used, or been replaced by a newer one.",
+  "magicLinkInvalid.sendNewLink": "Send a new link",
+  "dashboard.heading": "Your dashboard",
+  "dashboard.emptyState": "No trips yet. Once you add one, it'll show up here.",
+  "dashboard.logout": "Log out"
+}
