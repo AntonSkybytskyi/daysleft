@@ -44,4 +44,4 @@
 | T36 | Register Alert success variant | docs | Frontend Lead | S | — | done |
 | T37 | Replace skipped e2e stubs with real coverage | tests | Frontend Lead | M | T18, T19, T20, T21, T22, T23 | done |
 
-**Total:** 37 tasks (17 done + 20 review follow-ups), ~9 + ~7 person-days.
+**Total:** 37 tasks, all done (17 original + 20 review-2026-09-03 follow-ups), ~9 + ~7 person-days.
