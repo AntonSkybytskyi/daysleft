@@ -79,13 +79,16 @@ export async function handleClerkWebhook(
   const priorCanonicalUser = priorCanonicalId ? await deps.repository.findById(priorCanonicalId) : null;
 
   // A stored mapping is only ever a snapshot of the email that justified it. Invalidate it
-  // only when this event proves that email actually changed — either this account's own
+  // only when this event PROVES that email actually changed — either this account's own
   // stored email (ownRecord, present only for a canonical account), or the canonical account
   // this identity previously resolved to no longer sharing the new verified email — never on
   // an unrelated profile edit (display name, avatar, metadata), which would otherwise re-fire
-  // the "linked" banner and cost an extra Clerk fetch for nothing.
-  const ownEmailChanged = ownRecord !== null && ownRecord.email !== verifiedEmail;
-  const noLongerMatchesCanonical = priorCanonicalUser !== null && priorCanonicalUser.email !== verifiedEmail;
+  // the "linked" banner and cost an extra Clerk fetch for nothing. A null verifiedEmail (no
+  // verified address on this event) is absence of proof, not proof the email changed to null —
+  // gating on it here keeps that case a no-op until the 422 rejection below.
+  const ownEmailChanged = verifiedEmail !== null && ownRecord !== null && ownRecord.email !== verifiedEmail;
+  const noLongerMatchesCanonical =
+    verifiedEmail !== null && priorCanonicalUser !== null && priorCanonicalUser.email !== verifiedEmail;
 
   if (ownEmailChanged || noLongerMatchesCanonical) {
     await deps.linkedIdentities.invalidate(data.id);

@@ -247,6 +247,25 @@ describe("handleClerkWebhook", () => {
     expect(linkedIdentities.invalidate).not.toHaveBeenCalled();
   });
 
+  it("does not invalidate the mapping on an event with no verified email — absence of proof is not proof of change", async () => {
+    const repository = fakeRepository({
+      findById: vi.fn().mockResolvedValue({ id: "user_canonical", email: "traveler@example.test" }),
+    });
+    const linkedIdentities = { invalidate: vi.fn().mockResolvedValue(undefined), findCanonicalUserId: vi.fn().mockResolvedValue(null) };
+    // No verified email on this event (e.g. a pending secondary address) — verifiedEmail resolves
+    // to null, which must not be treated as evidence the stored email changed to null.
+    const payload = eventPayload({ id: "user_canonical", verified: false });
+    const verify = vi.fn().mockReturnValue({ valid: true, event: JSON.parse(payload) });
+
+    const result = await handleClerkWebhook(
+      { headers: validHeaders, rawBody: payload },
+      { webhookSecret, repository, verify, linkedIdentities: linkedIdentities as never },
+    );
+
+    expect(result.status).toBe(422);
+    expect(linkedIdentities.invalidate).not.toHaveBeenCalled();
+  });
+
   it("invalidates a linked identity's own mapping once its verified email no longer matches the canonical account it resolved to", async () => {
     const repository = fakeRepository({
       findById: vi.fn().mockImplementation(async (id: string) =>
