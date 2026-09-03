@@ -168,8 +168,16 @@ export function SsoCallbackContainer({
   if (screenState === "verified-elsewhere") {
     // No resend handle passed at all — a future edit adding a button to this branch would find
     // no handler wired, rather than silently re-arming the session-superseding resend round 4
-    // removed.
-    return <MagicLinkInvalidScreen state="verified-elsewhere" strings={strings} />;
+    // removed. ClientMismatch fires on client identity, not a confirmed session (a closed
+    // originating tab can produce the same signal with nothing actually established), so this
+    // gets the same non-destructive "back to login" path the sign-up branch has, not a dead end.
+    return (
+      <MagicLinkInvalidScreen
+        state="verified-elsewhere"
+        onBackToLogin={() => router.replace("/login")}
+        strings={strings}
+      />
+    );
   }
 
   if (screenState === "verified-elsewhere-unconfirmed") {

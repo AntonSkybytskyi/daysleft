@@ -37,14 +37,20 @@ describe("MagicLinkInvalidScreen", () => {
     expect(onSendNewLink).toHaveBeenCalledOnce();
   });
 
-  it("verified-elsewhere: tells the truth (the link worked, on the other device) and offers no resend", () => {
-    render(<MagicLinkInvalidScreen state="verified-elsewhere" onSendNewLink={vi.fn()} />);
+  it("verified-elsewhere: doesn't claim a confirmed sign-in (ClientMismatch fires on client identity, not a confirmed session) and offers a non-destructive way back, not a dead end", async () => {
+    const onBackToLogin = vi.fn();
+    render(<MagicLinkInvalidScreen state="verified-elsewhere" onSendNewLink={vi.fn()} onBackToLogin={onBackToLogin} />);
 
-    expect(screen.getByRole("status")).toHaveTextContent(/signed in on your other device/i);
-    // A resend here would create a NEW sign-in attempt that supersedes the one that just
-    // succeeded on the other device — offering it would let the Traveler destroy their own
-    // freshly-established session.
+    // Must NOT unconditionally assert the Traveler is signed in — a closed originating tab can
+    // yield the same ClientMismatch signal with no session actually established.
+    expect(screen.getByRole("status")).not.toHaveTextContent(/you.re signed in/i);
+    // A resend here would create a NEW sign-in attempt that could supersede one that genuinely
+    // did just succeed on the other device — offering it would let the Traveler destroy their
+    // own freshly-established session.
     expect(screen.queryByRole("button", { name: "Send a new link" })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Back to login" }));
+    expect(onBackToLogin).toHaveBeenCalledOnce();
   });
 
   it("verified-elsewhere-unconfirmed: a first-time sign-up's second device gets a non-destructive way back, not a false success claim or a dead end", async () => {

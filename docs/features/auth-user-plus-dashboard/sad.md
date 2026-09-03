@@ -191,6 +191,10 @@ sequenceDiagram
 
 **Critical flow 3: Magic-link invalid, or completed on a different device (US-01, AC-02/AC-02b)**
 
+Scoped to a returning Traveler's sign-in (the magic-link identifier resolves to an existing
+account). A first-time sign-up's magic link has no originating-device poll at all — see the note
+after the diagram.
+
 ```mermaid
 sequenceDiagram
     actor Traveler
@@ -212,10 +216,18 @@ sequenceDiagram
         API routes->>Postgres: upserts users shadow row
         Clerk-->>Web UI (originating device): poll observes verified — session established
         Web UI (originating device)-->>Traveler: shows the dashboard directly, on the originating device
-        Clerk-->>Web UI (opening device): reports verified-on-other-device
-        Web UI (opening device)-->>Traveler: shows "you're signed in on your other device", no resend CTA
+        Clerk-->>Web UI (opening device): reports verified-on-other-device (client identity, not a confirmed session)
+        Web UI (opening device)-->>Traveler: shows "this link was opened on another device", offers "Back to login" (no resend, no unconfirmed success claim)
     end
 ```
+
+A first-time sign-up's magic link (identifier has no existing account) has no originating-device
+poll to report completion to — `signUp.prepareEmailAddressVerification` sends the link directly,
+so no device is watching for it. Its opening device gets the same `ClientMismatch`/
+`onVerifiedOnOtherDevice` signal, routed to a distinct `verified-elsewhere-unconfirmed` state:
+no claim of success either way, no destructive resend (nothing established to supersede, but also
+nothing to confirm), just the same non-destructive "Back to login" CTA. Tracked as a known gap
+(no poll exists for this sub-branch) in spec.md §8.
 
 **Critical flow 4: Account-linking blocked — no verified email from provider (US-02, AC-03b)**
 

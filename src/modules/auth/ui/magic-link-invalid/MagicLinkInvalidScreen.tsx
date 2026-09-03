@@ -28,8 +28,12 @@ const defaultStrings: MagicLinkInvalidScreenStrings = {
   sendNewLink: "Send a new link",
   errorRateLimited: "Too many requests. Wait a bit before trying again.",
   errorSignInFailed: "Couldn't send a new link. Try again in a moment.",
-  verifiedElsewhereHeading: "You're signed in",
-  verifiedElsewhereBody: "This link was opened on another device. You're signed in on your other device — you can close this tab.",
+  // Clerk's ClientMismatch fires on client identity, not a confirmed session — a closed
+  // originating tab can produce the same signal with no sign-in ever completed there, so this
+  // can't unconditionally claim success (see MagicLinkInvalidScreen.test.tsx's verified-elsewhere).
+  verifiedElsewhereHeading: "This link was opened on another device",
+  verifiedElsewhereBody:
+    "If you completed sign-in there, you're all set and can close this tab. If not, go back and try again.",
   unconfirmedElsewhereHeading: "This link was already opened elsewhere",
   unconfirmedElsewhereBody:
     "This device can't confirm whether that completed. If it didn't, go back and request a new link.",
@@ -38,8 +42,8 @@ const defaultStrings: MagicLinkInvalidScreenStrings = {
 
 export type MagicLinkInvalidScreenProps = {
   state: MagicLinkInvalidScreenState;
-  // Only rendered by "default"/"loading"/"error-*" — neither "verified-elsewhere" state has a
-  // resend CTA (nothing to supersede in one case, nothing safe to offer in the other), so the
+  // Only rendered by "default"/"loading"/"error-*" — neither "verified-elsewhere" state offers
+  // a resend (it could supersede a session that genuinely did just complete elsewhere), so the
   // handle stays unreachable rather than merely unrendered.
   onSendNewLink?: () => void;
   onBackToLogin?: () => void;
@@ -53,7 +57,10 @@ export function MagicLinkInvalidScreen({ state, onSendNewLink, onBackToLogin, st
     return (
       <div className="mx-auto flex max-w-sm flex-col gap-4 px-6 py-16">
         <h1 className="text-lg font-semibold text-slate-900">{t.verifiedElsewhereHeading}</h1>
-        <Alert variant="success">{t.verifiedElsewhereBody}</Alert>
+        <Alert variant="info">{t.verifiedElsewhereBody}</Alert>
+        <Button variant="primary" onClick={onBackToLogin}>
+          {t.backToLogin}
+        </Button>
       </div>
     );
   }

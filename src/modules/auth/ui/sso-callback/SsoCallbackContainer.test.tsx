@@ -120,10 +120,16 @@ describe("SsoCallbackContainer — email-link flow", () => {
       />,
     );
 
-    expect(await screen.findByText(/signed in on your other device/i)).toBeInTheDocument();
+    expect(await screen.findByText(/opened on another device/i)).toBeInTheDocument();
     expect(screen.queryByText(/no longer valid/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /send a new link/i })).not.toBeInTheDocument();
     expect(replace).not.toHaveBeenCalled();
+
+    // ClientMismatch fires on client identity, not a confirmed session — a non-destructive way
+    // back, not a dead end, in case a closed originating tab produced this signal with nothing
+    // actually established.
+    await userEvent.click(screen.getByRole("button", { name: "Back to login" }));
+    expect(replace).toHaveBeenCalledWith("/login");
   });
 
   it("renders verified-elsewhere with the strings passed down from the page (i18n), not hardcoded English", async () => {
@@ -350,7 +356,7 @@ describe("SsoCallbackContainer — email-link flow", () => {
 
     capturedOpts.onVerifiedOnOtherDevice?.();
 
-    expect(await screen.findByText(/signed in on your other device/i)).toBeInTheDocument();
+    expect(await screen.findByText(/opened on another device/i)).toBeInTheDocument();
     expect(screen.queryByText(/no longer valid/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /send a new link/i })).not.toBeInTheDocument();
     expect(replace).not.toHaveBeenCalled();

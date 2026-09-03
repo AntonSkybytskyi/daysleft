@@ -103,15 +103,23 @@ Decisions carried from the ideation pass: account-linking by verified email (clo
 
 ### AC-02b (US-01) — happy path
 
-**Given** a Traveler requests a magic-link on one device and opens it on a different device or browser
+Scoped to a **returning Traveler's sign-in** — the magic-link identifier already resolves to an
+existing account. The sign-up sub-branch (a first-time email) is a separate, narrower gap tracked
+in §8's open questions below, not covered by this Then.
+
+**Given** a returning Traveler requests a magic-link on one device and opens it on a different device or browser
 **When** they complete sign-in from the link
-**Then** the system signs them in on the **originating device** (the one that requested the link) and shows the dashboard there, once its background poll observes the completion — while the device that opened the link is shown a truthful "you're signed in on your other device" state, with no CTA that could supersede the completing attempt
+**Then** the system signs them in on the **originating device** (the one that requested the link) and shows the dashboard there, once its background poll observes the completion — while the device that opened the link is told the link was opened elsewhere, without asserting a session is confirmed there (Clerk's `ClientMismatch`/`onVerifiedOnOtherDevice` signal fires on client identity, not a confirmed session — a closed originating tab can produce it too), and is given a non-destructive way back to login rather than a CTA that could supersede a completing attempt
 
 Resolved (round 4/5 review): Clerk's email-link verification model reports completion to the
 device that *requested* the link, not the device that opened it — `onVerifiedOnOtherDevice`/
 `ClientMismatch` fire on the opening device precisely when the other device's sign-in already
 succeeded. The originating-device outcome is the one the SDK can actually deliver; round 4 chose
 it over a same-device-only constraint or an unsupported "hand off" redirect.
+
+Resolved (round 6/7 review, T75): the opening-device wording no longer claims a confirmed
+session — `ClientMismatch` is a client-identity signal, not proof the sign-in actually completed
+(a closed originating tab can produce it too) — and offers "Back to login" instead of a dead end.
 
 ### AC-03 (US-02) — domain invariant
 
