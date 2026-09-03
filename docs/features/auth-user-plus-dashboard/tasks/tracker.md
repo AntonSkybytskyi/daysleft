@@ -47,7 +47,7 @@
 | T38 | Use Clerk's email-link verification API for magic-link completion | ui | Frontend Lead | M | — | done |
 | T39 | Close path-traversal bypass in resolveLoginReturnTo | wiring | Backend Lead | S | — | done |
 | T40 | Verify webhook signature before consulting dedupe cache | infra | Backend Lead | S | — | done |
-| T41 | Persist second identity so the "linked" banner clears | app | Backend Lead | M | — | todo |
+| T41 | Persist second identity so the "linked" banner clears | app | Backend Lead | M | — | done |
 | T42 | Wire SCR-04 i18n strings + add dashboard.errorFetchFailed key | ui | Frontend Lead | S | T38 | todo |
 | T43 | Add `linked` field + webhook ignored-event body to openapi.yaml | docs | Backend Lead | S | — | todo |
 | T44 | Handle the logout response instead of always redirecting | ui | Frontend Lead | S | — | todo |

@@ -74,6 +74,30 @@ describe("getSessionUser", () => {
     expect(result).toEqual({ authenticated: true, user: existingByEmail, linked: true });
   });
 
+  it("clears the linked banner on a repeat request for the same linked identity, with only one Clerk fetch total", async () => {
+    const existingByEmail = { id: "user_via_google", email: "traveler@example.test", createdAt: new Date(), updatedAt: new Date() };
+    const findById = vi.fn().mockImplementation(async (id: string) => (id === "user_via_google" ? existingByEmail : null));
+    const repository = fakeRepository({
+      findById,
+      findByEmail: vi.fn().mockResolvedValue(existingByEmail),
+      upsertById: vi.fn().mockResolvedValue({ kind: "ok", user: existingByEmail }),
+    });
+    const fetchClerkUser = vi.fn().mockResolvedValue({ id: "user_via_magic_link", verifiedEmail: "traveler@example.test" });
+    const deps: SessionDeps = {
+      getAuthUserId: vi.fn().mockResolvedValue("user_via_magic_link"),
+      repository,
+      fetchClerkUser,
+      linkedIdentities: new Map(),
+    };
+
+    const first = await getSessionUser(deps);
+    const second = await getSessionUser(deps);
+
+    expect(first).toEqual({ authenticated: true, user: existingByEmail, linked: true });
+    expect(second).toEqual({ authenticated: true, user: existingByEmail, linked: false });
+    expect(fetchClerkUser).toHaveBeenCalledTimes(1);
+  });
+
   it("resolves to unauthenticated with no data leaked when Clerk has no verified email for this user", async () => {
     const repository = fakeRepository();
     const deps: SessionDeps = {
