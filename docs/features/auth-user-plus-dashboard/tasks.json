@@ -909,7 +909,7 @@
       "acs": [
         "AC-02b"
       ],
-      "dod": "round-4 review resolved the AC-02b fork as (a) poll + complete on the originating device, keeping AC-02b's current wording. CheckEmailContainer/the /check-email page uses Clerk's signIn.createEmailLinkFlow()/startEmailLinkFlow() (or equivalent) to long-poll the sign-in attempt it created, so opening the link on a second device completes the sign-in and navigates the ORIGINATING device to the dashboard (or validated return_to) once Clerk reports verified; the second device (where onVerifiedOnOtherDevice/ClientMismatch fire) renders a distinct, truthful state — e.g. 'verified-on-other-device', 'you're signed in on your other device' — with no 'send new link' CTA that could supersede the completing attempt; screens.md documents the new SCR-02 (polling/verified) and SCR-04 (verified-on-other-device) states; ADR-0001's Consequences section gains a note on the email-link cross-device model; test-plan.md:36 gets a real (not just planned) e2e scenario for AC-02b, and e2e/auth-dashboard.spec.ts adds it (or an explicitly-named skip if a live Clerk instance still isn't available, per the existing T47 pattern — never silently green); SsoCallbackContainer.test.tsx:109-123,249-267 are rewritten to assert the new decided outcome, not the previous deviation",
+      "dod": "round-4 review resolved the AC-02b fork as (a) poll + complete on the originating device, keeping AC-02b's current wording. CheckEmailContainer/the /check-email page uses Clerk's signIn.createEmailLinkFlow()/startEmailLinkFlow() (or equivalent) to long-poll the sign-in attempt it created, so opening the link on a second device completes the sign-in and navigates the ORIGINATING device to the dashboard (or validated return_to) once Clerk reports verified; the second device (where onVerifiedOnOtherDevice/ClientMismatch fire) renders a distinct, truthful state \u2014 e.g. 'verified-on-other-device', 'you're signed in on your other device' \u2014 with no 'send new link' CTA that could supersede the completing attempt; screens.md documents the new SCR-02 (polling/verified) and SCR-04 (verified-on-other-device) states; ADR-0001's Consequences section gains a note on the email-link cross-device model; test-plan.md:36 gets a real (not just planned) e2e scenario for AC-02b, and e2e/auth-dashboard.spec.ts adds it (or an explicitly-named skip if a live Clerk instance still isn't available, per the existing T47 pattern \u2014 never silently green); SsoCallbackContainer.test.tsx:109-123,249-267 are rewritten to assert the new decided outcome, not the previous deviation",
       "files_hint": [
         "src/modules/auth/ui/check-email/CheckEmailContainer.tsx",
         "src/app/check-email/page.tsx",
@@ -946,7 +946,7 @@
       "acs": [
         "AC-03"
       ],
-      "dod": "a persisted identity→user mapping in linked_identities is not trusted indefinitely once the underlying Clerk identity's email changes; either the mapping is re-validated against Clerk before use, or it is kept in sync via the user.updated webhook (update/delete path), so a stale mapping cannot permanently attribute one person's identity to another user's account; test covers an identity whose email changed after linking",
+      "dod": "a persisted identity\u2192user mapping in linked_identities is not trusted indefinitely once the underlying Clerk identity's email changes; either the mapping is re-validated against Clerk before use, or it is kept in sync via the user.updated webhook (update/delete path), so a stale mapping cannot permanently attribute one person's identity to another user's account; test covers an identity whose email changed after linking",
       "files_hint": [
         "src/modules/auth/app/session.ts",
         "src/modules/auth/infra/linked-identities-repository.ts",
@@ -975,11 +975,168 @@
       "acs": [
         "AC-02"
       ],
-      "dod": "screens.md:97's SCR-02 error-sign-in-failed row cites AC-02 (resend failure), not AC-02b, matching the parallel SCR-04 row; scripts/migrate-down.ts's deleteJournalRowSql no longer string-interpolates created_at into the SQL text — either the executor takes a parameterized query (sql, params) so both the CLI and the test keep a parameterized DELETE, or resolveRevertTarget guards Number.isFinite(last.when) before building the statement",
+      "dod": "screens.md:97's SCR-02 error-sign-in-failed row cites AC-02 (resend failure), not AC-02b, matching the parallel SCR-04 row; scripts/migrate-down.ts's deleteJournalRowSql no longer string-interpolates created_at into the SQL text \u2014 either the executor takes a parameterized query (sql, params) so both the CLI and the test keep a parameterized DELETE, or resolveRevertTarget guards Number.isFinite(last.when) before building the statement",
       "files_hint": [
         "docs/features/auth-user-plus-dashboard/screens.md",
         "scripts/migrate-down.ts",
         "tests/integration/migrations/migrate-down.test.ts"
+      ]
+    },
+    {
+      "id": "T65",
+      "title": "Amend spec/SAD/UX-flows to state AC-02b's originating-device outcome (close round-4's self-contradiction)",
+      "layer": "docs",
+      "deps": [],
+      "acs": [
+        "AC-02b"
+      ],
+      "dod": "spec.md's AC-02b Given/When/Then is reworded to state the sign-in completes and the dashboard is shown on the ORIGINATING device (the one that requested the link), not the device that opened it; sad.md \u00a76 flow 3's second branch is redrawn to match (session established on originating device via poll, opening device shown a truthful verified-elsewhere state); ux-flows.md's US-01 flowchart gains the verified-elsewhere branch and its AC-02b mapping is corrected to point at the originating-device outcome; all three artifacts agree with the shipped code and with each other",
+      "files_hint": [
+        "docs/features/auth-user-plus-dashboard/spec.md",
+        "docs/features/auth-user-plus-dashboard/sad.md",
+        "docs/features/auth-user-plus-dashboard/ux-flows.md"
+      ]
+    },
+    {
+      "id": "T66",
+      "title": "Surface a visible error instead of a silent no-op when the /check-email send guard fails",
+      "layer": "ui",
+      "deps": [
+        "T60"
+      ],
+      "acs": [
+        "AC-01",
+        "AC-02"
+      ],
+      "dod": "CheckEmailContainer's guards (status !== 'needs_first_factor', missing createEmailLinkFlow, no email_link factor with an emailAddressId) no longer leave state at 'default'/'resent-confirmation' while claiming a link was sent; a guard failure drives a visible error-sign-in-failed (or equivalent) state instead; the resend path does not show 'Link resent' before confirming a send was actually initiated; a test reproduces each guard-failure precondition and asserts the visible error state, not silence",
+      "files_hint": [
+        "src/modules/auth/ui/check-email/CheckEmailContainer.tsx",
+        "src/modules/auth/ui/check-email/CheckEmailContainer.test.tsx",
+        "src/modules/auth/ui/check-email/CheckEmailScreen.tsx"
+      ]
+    },
+    {
+      "id": "T67",
+      "title": "Give the sign-up branch's verified-elsewhere screen a non-destructive recovery CTA",
+      "layer": "ui",
+      "deps": [
+        "T60"
+      ],
+      "acs": [
+        "AC-01",
+        "AC-02b"
+      ],
+      "dod": "when a first-time Traveler's sign-up ClientMismatch routes to MagicLinkInvalidScreen's verified-elsewhere state, the screen no longer claims 'you're signed in on your other device' when no session exists anywhere for a sign-up flow, and it is no longer a dead end (no CTA at all); it offers a non-destructive path back (e.g. return to /login) without reintroducing the session-superseding resend that round 4 removed; a test covers the sign-up-branch ClientMismatch case distinctly from the sign-in-branch onVerifiedOnOtherDevice case",
+      "files_hint": [
+        "src/modules/auth/ui/sso-callback/SsoCallbackContainer.tsx",
+        "src/modules/auth/ui/magic-link-invalid/MagicLinkInvalidScreen.tsx",
+        "src/modules/auth/ui/magic-link-invalid/MagicLinkInvalidScreen.test.tsx"
+      ]
+    },
+    {
+      "id": "T68",
+      "title": "Scope linked-identity invalidation to actual email changes and cover the canonical-account side",
+      "layer": "data",
+      "deps": [
+        "T62"
+      ],
+      "acs": [
+        "AC-03"
+      ],
+      "dod": "the webhook no longer calls linkedIdentities.invalidate() on every user.updated event regardless of whether the verified email changed \u2014 it only invalidates when the computed verifiedEmail actually differs from what's on record, so an unrelated profile edit (display name, avatar, metadata) does not re-show the 'linked' banner and does not cost an extra Clerk fetch; invalidate() also clears rows where the CHANGED identity is the canonicalUserId, not only where it's the identityId, so a canonical account's email change also clears mappings that point at it; session.test.ts:117's 'clears the linked banner ... with only one Clerk fetch total' behavior still holds for a same-email update; a test drives the webhook and getSessionUser against the same database to prove the two paths actually meet",
+      "files_hint": [
+        "src/modules/auth/infra/routes/clerk-webhook.ts",
+        "src/modules/auth/infra/linked-identities-repository.ts",
+        "src/modules/auth/infra/linked-identities-repository.test.ts",
+        "src/modules/auth/app/session.ts",
+        "src/modules/auth/app/session.test.ts"
+      ]
+    },
+    {
+      "id": "T69",
+      "title": "Guard the /check-email poll against cancellation/unmount races and remount re-sends",
+      "layer": "ui",
+      "deps": [
+        "T60"
+      ],
+      "acs": [
+        "AC-02b"
+      ],
+      "dod": "CheckEmailContainer's pollForCompletion .then/.catch handlers check a monotonic generation (or per-invocation cancelled flag) before calling setState/setActive/router.replace, so a settlement from a poll that handleResend already cancelled cannot overwrite 'resent-confirmation' with an error, and a settlement after unmount cannot call setState or navigate; the mount effect does not start a fresh startEmailLinkFlow (and therefore does not send a new link) when a poll for the current sign-in attempt is already in flight \u2014 covers refresh/back-navigation/StrictMake double-mount; tests cover a resend racing a stale poll settlement and a remount while a poll is active",
+      "files_hint": [
+        "src/modules/auth/ui/check-email/CheckEmailContainer.tsx",
+        "src/modules/auth/ui/check-email/CheckEmailContainer.test.tsx"
+      ]
+    },
+    {
+      "id": "T70",
+      "title": "Fix CheckEmailContainer tests to match the real Clerk SignInStatus contract and cover the single-send guarantee",
+      "layer": "tests",
+      "deps": [
+        "T60"
+      ],
+      "acs": [
+        "AC-02",
+        "AC-02b"
+      ],
+      "dod": "the test asserting an 'expired' poll outcome no longer mocks signIn.status: 'expired' (not a member of the real SignInStatus union in @clerk/shared); it instead models expiry via firstFactorVerification.status === 'expired' while signIn.status stays 'needs_first_factor', and CheckEmailContainer.tsx reads that field to drive the expired state; needs_second_factor no longer falls into the generic error-sign-in-failed state without being named; a test asserts LoginContainer.tsx and SsoCallbackContainer.tsx call signIn.create/sendMagicLink without the email_link strategy exactly once per attempt (i.e. reverting either file's T60 change fails this test)",
+      "files_hint": [
+        "src/modules/auth/ui/check-email/CheckEmailContainer.tsx",
+        "src/modules/auth/ui/check-email/CheckEmailContainer.test.tsx",
+        "src/modules/auth/ui/login/LoginContainer.test.tsx",
+        "src/modules/auth/ui/sso-callback/SsoCallbackContainer.test.tsx"
+      ]
+    },
+    {
+      "id": "T71",
+      "title": "Retry or force-clear the client session when signOut() rejects after the server's 204",
+      "layer": "app",
+      "deps": [
+        "T61"
+      ],
+      "acs": [
+        "AC-06"
+      ],
+      "dod": "when the server-side logout returns 204 but clerk.signOut() rejects, the app no longer redirects while leaving a live client-side JWT/session \u2014 it retries the client-side signOut (not the server logout call, which now 401s) or force-clears the session cookie client-side before redirecting, so /dashboard and /api/v1/dashboard cannot still authenticate after a rejected signOut; test covers signOut() rejecting and asserts no live session remains",
+      "files_hint": [
+        "src/modules/dashboard/ui/DashboardContainer.tsx",
+        "src/modules/dashboard/ui/DashboardContainer.test.tsx"
+      ]
+    },
+    {
+      "id": "T72",
+      "title": "Wire the verified-elsewhere screen's strings through the i18n catalog",
+      "layer": "ui",
+      "deps": [
+        "T60"
+      ],
+      "acs": [
+        "AC-08"
+      ],
+      "dod": "verifiedElsewhereHeading/verifiedElsewhereBody are added to src/lib/i18n/en.json under magicLinkInvalid, to src/app/sso-callback/strings.ts's stringKeys, and resolveStrings resolves them per Accept-Language like the other magicLinkInvalid.* keys; MagicLinkInvalidScreen no longer hardcodes the English text for this state",
+      "files_hint": [
+        "src/lib/i18n/en.json",
+        "src/app/sso-callback/strings.ts",
+        "src/modules/auth/ui/magic-link-invalid/MagicLinkInvalidScreen.tsx"
+      ]
+    },
+    {
+      "id": "T73",
+      "title": "Clean up T60/T62 loose ends: dead resend CTA wiring, redundant Clerk import, optional invalidation dependency",
+      "layer": "docs",
+      "deps": [
+        "T60",
+        "T62",
+        "T67"
+      ],
+      "acs": [],
+      "dod": "SsoCallbackContainer no longer passes onSendNewLink into MagicLinkInvalidScreen's verified-elsewhere state now that T67 gives that state its own non-destructive CTA (the resend handle is unreachable, not just unrendered); CheckEmailContainer drops the redundant useClerk import from '@clerk/nextjs' and gets setActive from the existing useSignIn() (legacy) hook instead, narrowing the test's mock surface back down; clerk-webhook's linkedIdentities dependency is a required constructor argument, not optional-typed, so the AC-03 invalidation safety can't be silently dropped by a future caller",
+      "files_hint": [
+        "src/modules/auth/ui/sso-callback/SsoCallbackContainer.tsx",
+        "src/modules/auth/ui/check-email/CheckEmailContainer.tsx",
+        "src/modules/auth/ui/check-email/CheckEmailContainer.test.tsx",
+        "src/modules/auth/infra/routes/clerk-webhook.ts",
+        "src/app/webhooks/clerk/route.ts"
       ]
     }
   ]
