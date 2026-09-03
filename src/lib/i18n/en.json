@@ -12,6 +12,7 @@
   "checkEmail.heading": "Check your email",
   "checkEmail.body": "We sent a sign-in link to {email}. Didn't get it?",
   "checkEmail.resend": "Resend",
+  "checkEmail.resendPrompt": "Didn't get it?",
   "checkEmail.resentConfirmation": "Link resent to {email}.",
   "checkEmail.errorRateLimited": "Too many requests. Wait a bit before trying again.",
   "checkEmail.errorSignInFailed": "Couldn't resend the link. Try again in a moment.",

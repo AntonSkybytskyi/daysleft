@@ -12,6 +12,7 @@ export type CheckEmailScreenStrings = {
   heading: string;
   body: string;
   resend: string;
+  resendPrompt: string;
   resentConfirmation: string;
   errorRateLimited: string;
   errorSignInFailed: string;
@@ -21,6 +22,9 @@ const defaultStrings: CheckEmailScreenStrings = {
   heading: "Check your email",
   body: "We sent a sign-in link to {email}. Didn't get it?",
   resend: "Resend",
+  // Used instead of `body` on error-sign-in-failed — that state means no link is confirmed
+  // sent, so the "We sent a sign-in link..." claim would be false there.
+  resendPrompt: "Didn't get it?",
   resentConfirmation: "Link resent to {email}.",
   errorRateLimited: "Too many requests. Wait a bit before trying again.",
   errorSignInFailed: "Couldn't resend the link. Try again in a moment.",
@@ -51,6 +55,13 @@ export function CheckEmailScreen({ state, email, onResend, strings }: CheckEmail
           <LinkButton onClick={onResend} loading={state === "loading"}>
             {t.resend}
           </LinkButton>
+        </p>
+      )}
+
+      {state === "error-sign-in-failed" && (
+        <p className="text-sm text-slate-600">
+          {t.resendPrompt}{" "}
+          <LinkButton onClick={onResend}>{t.resend}</LinkButton>
         </p>
       )}
     </div>

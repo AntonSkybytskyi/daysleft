@@ -290,7 +290,10 @@ describe("SsoCallbackContainer — email-link flow", () => {
       // originating-device poll (see SsoCallbackContainer's isSignUp).
       expect.objectContaining({ strategy: "email_link", redirectUrl: expect.stringContaining("signup=1") }),
     );
-    expect(replace).toHaveBeenCalledWith(expect.stringContaining("/check-email"));
+    // /check-email's own mount guard has no originating-device signIn attempt to poll for a
+    // sign-up arrival — the signup=1 marker here (not just on the Clerk redirectUrl above) is
+    // what lets it skip that guard instead of rendering a false error.
+    expect(replace).toHaveBeenCalledWith(expect.stringMatching(/\/check-email\?.*signup=1/));
   });
 
   it("shows a visible error-sign-in-failed state (not a silent revert to default) when resend fails for a non-429, non-sign-up reason", async () => {

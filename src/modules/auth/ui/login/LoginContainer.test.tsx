@@ -45,8 +45,11 @@ describe("LoginContainer — magic-link sign-up fallback", () => {
     expect(prepareEmailAddressVerification).toHaveBeenCalledWith(
       expect.objectContaining({ strategy: "email_link" }),
     );
+    // The signup=1 marker tells /check-email this arrival has no originating-device sign-in
+    // attempt to poll (the link already sent above via prepareEmailAddressVerification), so its
+    // mount guard must not mistake that absence for a failed send.
     expect(push).toHaveBeenCalledWith(
-      `/check-email?email=${encodeURIComponent("new-traveler@example.test")}&return_to=${encodeURIComponent("/dashboard")}`,
+      `/check-email?email=${encodeURIComponent("new-traveler@example.test")}&return_to=${encodeURIComponent("/dashboard")}&signup=1`,
     );
   });
 

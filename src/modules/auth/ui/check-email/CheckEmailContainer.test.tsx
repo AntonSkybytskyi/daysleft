@@ -235,5 +235,16 @@ describe("CheckEmailContainer", () => {
 
       expect(screen.getByRole("alert")).toBeInTheDocument();
     });
+
+    it("does not run the sign-in poll guard for a first-time sign-up arrival — the link already sent before navigating here", () => {
+      // A sign-up arrival has no needs_first_factor signIn attempt at all (this is a brand-new
+      // identifier); the guard would otherwise mistake that absence for a failure.
+      signInValue = { create: signInCreate, status: undefined };
+
+      render(<CheckEmailContainer email="new-traveler@example.test" returnTo="/dashboard" isSignUp />);
+
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      expect(screen.getByText(/check your email/i)).toBeInTheDocument();
+    });
   });
 });

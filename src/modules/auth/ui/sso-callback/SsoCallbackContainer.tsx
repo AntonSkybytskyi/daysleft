@@ -137,12 +137,14 @@ export function SsoCallbackContainer({
     // not the sign-in one above, since sendMagicLink's real signIn.create() doesn't take it.
     const signUpRedirectUrl = `${redirectUrl}&signup=1`;
 
-    const goToCheckEmail = () =>
-      router.replace(`/check-email?email=${encodeURIComponent(email)}&return_to=${encodeURIComponent(returnTo)}`);
+    const goToCheckEmail = (isSignUpArrival: boolean) =>
+      router.replace(
+        `/check-email?email=${encodeURIComponent(email)}&return_to=${encodeURIComponent(returnTo)}${isSignUpArrival ? "&signup=1" : ""}`,
+      );
 
     try {
       await sendMagicLink({ identifier: email, redirectUrl });
-      goToCheckEmail();
+      goToCheckEmail(false);
       return;
     } catch (error) {
       const signUpClient = deps?.signUp ?? signUp;
@@ -154,7 +156,9 @@ export function SsoCallbackContainer({
       try {
         await signUpClient.create({ emailAddress: email });
         await signUpClient.prepareEmailAddressVerification({ strategy: "email_link", redirectUrl: signUpRedirectUrl });
-        goToCheckEmail();
+        // /check-email's mount guard has no originating-device signIn attempt to poll for a
+        // sign-up arrival — mark it so the guard skips instead of rendering a false error.
+        goToCheckEmail(true);
       } catch (signUpError) {
         setResendState(isRateLimited(signUpError) ? "error-rate-limited" : "error-sign-in-failed");
       }

@@ -5,7 +5,7 @@ import { DASHBOARD_PATH } from "@/modules/dashboard/app/get-dashboard";
 import { resolveStrings } from "./strings";
 
 type CheckEmailPageProps = {
-  searchParams: { email?: string; return_to?: string };
+  searchParams: { email?: string; return_to?: string; signup?: string };
 };
 
 export default function CheckEmailPage({ searchParams }: CheckEmailPageProps) {
@@ -22,6 +22,7 @@ export default function CheckEmailPage({ searchParams }: CheckEmailPageProps) {
     <CheckEmailContainer
       email={searchParams.email ?? ""}
       returnTo={returnTo}
+      isSignUp={searchParams.signup === "1"}
       strings={resolveStrings(acceptLanguage)}
     />
   );

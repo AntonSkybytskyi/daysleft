@@ -31,4 +31,13 @@ describe("CheckEmailScreen", () => {
     render(<CheckEmailScreen state="error-rate-limited" email="traveler@example.test" onResend={vi.fn()} />);
     expect(screen.getByRole("alert")).toHaveTextContent(/too many requests/i);
   });
+
+  it("error-sign-in-failed: shows the error AND a working resend, not a dead end", async () => {
+    const onResend = vi.fn();
+    render(<CheckEmailScreen state="error-sign-in-failed" email="traveler@example.test" onResend={onResend} />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent(/couldn't resend the link/i);
+    await userEvent.click(screen.getByRole("button", { name: "Resend" }));
+    expect(onResend).toHaveBeenCalledOnce();
+  });
 });

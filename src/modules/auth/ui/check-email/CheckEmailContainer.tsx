@@ -9,6 +9,11 @@ import { CheckEmailScreen, type CheckEmailScreenState, type CheckEmailScreenStri
 export type CheckEmailContainerProps = {
   email: string;
   returnTo: string;
+  // True when this arrival is a first-time sign-up (LoginContainer's/SsoCallbackContainer's
+  // form_identifier_not_found fallback). A sign-up attempt already sent its link via
+  // signUp.prepareEmailAddressVerification before navigating here and has no needs_first_factor
+  // signIn resource to poll — the mount guard must not mistake that absence for a failed send.
+  isSignUp?: boolean;
   strings?: Partial<CheckEmailScreenStrings>;
 };
 
@@ -38,7 +43,7 @@ type PollableSignIn = {
 // navigating once a resend has cancelled it, or the component has unmounted.
 type PollHandle = { cancelled: boolean; cancel: () => void };
 
-export function CheckEmailContainer({ email, returnTo, strings }: CheckEmailContainerProps) {
+export function CheckEmailContainer({ email, returnTo, isSignUp = false, strings }: CheckEmailContainerProps) {
   const router = useRouter();
   const { signIn, isLoaded, setActive } = useSignIn();
   const { signUp, isLoaded: isSignUpLoaded } = useSignUp();
@@ -103,7 +108,7 @@ export function CheckEmailContainer({ email, returnTo, strings }: CheckEmailCont
   };
 
   useEffect(() => {
-    if (!isLoaded) {
+    if (!isLoaded || isSignUp) {
       return;
     }
     pollForCompletion(signIn as unknown as PollableSignIn);
