@@ -4,7 +4,7 @@ import { resolveLoginReturnTo } from "@/modules/auth/app/return-to";
 import { DASHBOARD_PATH } from "@/modules/dashboard/app/get-dashboard";
 
 type SsoCallbackPageProps = {
-  searchParams: { return_to?: string };
+  searchParams: { return_to?: string; flow?: string };
 };
 
 export default function SsoCallbackPage({ searchParams }: SsoCallbackPageProps) {
@@ -15,6 +15,7 @@ export default function SsoCallbackPage({ searchParams }: SsoCallbackPageProps) 
     requestHeaders.get("x-forwarded-proto"),
     DASHBOARD_PATH,
   );
+  const flow = searchParams.flow === "email_link" ? "email_link" : "oauth";
 
-  return <SsoCallbackContainer returnTo={returnTo} />;
+  return <SsoCallbackContainer returnTo={returnTo} flow={flow} />;
 }
