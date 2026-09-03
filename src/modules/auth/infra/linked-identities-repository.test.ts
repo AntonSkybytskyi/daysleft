@@ -59,4 +59,16 @@ describe("LinkedIdentitiesRepository", () => {
   it("invalidate on an identity with no mapping is a no-op, not an error", async () => {
     await expect(repository.invalidate("user_never_linked")).resolves.toBeUndefined();
   });
+
+  it("invalidate also clears mappings keyed by canonicalUserId, not only identityId", async () => {
+    await users.upsertById({ id: "user_canonical", email: "traveler@example.test" });
+    await repository.link("user_second_identity", "user_canonical");
+
+    // The canonical account's own Clerk profile changed — every identity mapped to it
+    // was justified by its old email, so those mappings must clear too, not just a
+    // mapping keyed by "user_canonical" as an identityId (which never exists).
+    await repository.invalidate("user_canonical");
+
+    expect(await repository.findCanonicalUserId("user_second_identity")).toBeNull();
+  });
 });

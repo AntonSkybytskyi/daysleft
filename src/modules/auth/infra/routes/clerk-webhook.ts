@@ -20,10 +20,10 @@ export type ClerkWebhookDeps = {
   verify?: typeof verifyClerkWebhook;
   dedupeStore?: WebhookDedupeStore;
   // A stored linked_identities row is only a snapshot of the email that justified it at link
-  // time — invalidating it here on any user.created/user.updated for that identity forces the
-  // next interactive session to re-derive the mapping from Clerk's current data, instead of
-  // durably misattributing the identity to a stale canonical account forever.
-  linkedIdentities?: Pick<LinkedIdentitiesRepository, "invalidate">;
+  // time — invalidating it once this event proves that email actually changed (either side)
+  // forces the next interactive session to re-derive the mapping from Clerk's current data,
+  // instead of durably misattributing the identity to a stale canonical account forever.
+  linkedIdentities?: Pick<LinkedIdentitiesRepository, "invalidate" | "findCanonicalUserId">;
 };
 
 export type ClerkWebhookResult = {
@@ -67,10 +67,30 @@ export async function handleClerkWebhook(
   }
 
   const data = event.data;
-  await deps.linkedIdentities?.invalidate(data.id);
   const emailAddresses = Array.isArray(data.email_addresses) ? data.email_addresses : [];
   const verifiedEntry = emailAddresses.find((entry) => entry.verification?.status === "verified");
   const verifiedEmail = verifiedEntry?.email_address ?? null;
+
+  if (deps.linkedIdentities) {
+    const [ownRecord, priorCanonicalId] = await Promise.all([
+      deps.repository.findById(data.id),
+      deps.linkedIdentities.findCanonicalUserId(data.id),
+    ]);
+    const priorCanonicalUser = priorCanonicalId ? await deps.repository.findById(priorCanonicalId) : null;
+
+    // A stored mapping is only ever a snapshot of the email that justified it. Invalidate it
+    // only when this event proves that email actually changed — either this account's own
+    // stored email (ownRecord, present only for a canonical account), or the canonical
+    // account this identity previously resolved to no longer sharing the new verified email —
+    // never on an unrelated profile edit (display name, avatar, metadata), which would
+    // otherwise re-fire the "linked" banner and cost an extra Clerk fetch for nothing.
+    const ownEmailChanged = ownRecord !== null && ownRecord.email !== verifiedEmail;
+    const noLongerMatchesCanonical = priorCanonicalUser !== null && priorCanonicalUser.email !== verifiedEmail;
+
+    if (ownEmailChanged || noLongerMatchesCanonical) {
+      await deps.linkedIdentities.invalidate(data.id);
+    }
+  }
 
   const existing = verifiedEmail ? await deps.repository.findByEmail(verifiedEmail) : null;
   const decision = resolveAccountLinking({ clerkUserId: data.id, verifiedEmail }, existing);

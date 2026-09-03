@@ -204,19 +204,66 @@ describe("handleClerkWebhook", () => {
     expect(JSON.stringify(second.body)).not.toContain("user_1");
   });
 
-  it("invalidates any stored linked-identity mapping for the event's identity on user.created/user.updated", async () => {
-    const repository = fakeRepository();
-    const linkedIdentities = { invalidate: vi.fn().mockResolvedValue(undefined) };
-    const verify = vi.fn().mockReturnValue({ valid: true, event: JSON.parse(eventPayload({ id: "user_second_identity" })) });
+  it("invalidates the mapping when the event's own stored email actually changed", async () => {
+    const repository = fakeRepository({
+      findById: vi.fn().mockResolvedValue({ id: "user_canonical", email: "old@example.test" }),
+    });
+    const linkedIdentities = { invalidate: vi.fn().mockResolvedValue(undefined), findCanonicalUserId: vi.fn().mockResolvedValue(null) };
+    const payload = eventPayload({ id: "user_canonical", email: "new@example.test" });
+    const verify = vi.fn().mockReturnValue({ valid: true, event: JSON.parse(payload) });
 
     await handleClerkWebhook(
-      { headers: validHeaders, rawBody: eventPayload({ id: "user_second_identity" }) },
+      { headers: validHeaders, rawBody: payload },
       { webhookSecret, repository, verify, linkedIdentities: linkedIdentities as never },
     );
 
-    // A stored mapping is only ever a snapshot of the email that justified it — if the
-    // identity's Clerk profile changed (this event proves it did), the old mapping must not
-    // survive to silently misattribute the identity to whichever account it used to resolve to.
+    // A stored mapping is only ever a snapshot of the email that justified it — if this
+    // account's own verified email actually changed (this event proves it did, vs. what
+    // repository.findById reports on record), any mapping resting on the old email must not
+    // survive to silently misattribute an identity to it.
+    expect(linkedIdentities.invalidate).toHaveBeenCalledWith("user_canonical");
+  });
+
+  it("does not invalidate anything when the event's email matches what's already on record (an unrelated profile edit)", async () => {
+    const repository = fakeRepository({
+      findById: vi.fn().mockResolvedValue({ id: "user_canonical", email: "traveler@example.test" }),
+    });
+    const linkedIdentities = { invalidate: vi.fn().mockResolvedValue(undefined), findCanonicalUserId: vi.fn().mockResolvedValue(null) };
+    const payload = eventPayload({ id: "user_canonical", email: "traveler@example.test" });
+    const verify = vi.fn().mockReturnValue({ valid: true, event: JSON.parse(payload) });
+
+    await handleClerkWebhook(
+      { headers: validHeaders, rawBody: payload },
+      { webhookSecret, repository, verify, linkedIdentities: linkedIdentities as never },
+    );
+
+    // A display-name/avatar/metadata-only user.updated must not re-fire the "linked" banner or
+    // cost an extra Clerk fetch on the next session read — see session.test.ts's pinned
+    // "one Clerk fetch total" invariant.
+    expect(linkedIdentities.invalidate).not.toHaveBeenCalled();
+  });
+
+  it("invalidates a linked identity's own mapping once its verified email no longer matches the canonical account it resolved to", async () => {
+    const repository = fakeRepository({
+      findById: vi.fn().mockImplementation(async (id: string) =>
+        id === "user_canonical" ? { id: "user_canonical", email: "traveler@example.test" } : null,
+      ),
+    });
+    const linkedIdentities = {
+      invalidate: vi.fn().mockResolvedValue(undefined),
+      findCanonicalUserId: vi.fn().mockResolvedValue("user_canonical"),
+    };
+    const payload = eventPayload({ id: "user_second_identity", email: "changed@example.test" });
+    const verify = vi.fn().mockReturnValue({ valid: true, event: JSON.parse(payload) });
+
+    await handleClerkWebhook(
+      { headers: validHeaders, rawBody: payload },
+      { webhookSecret, repository, verify, linkedIdentities: linkedIdentities as never },
+    );
+
+    // The identity's own record (there is none — only canonical accounts get a `users` row)
+    // never changed, but its verified email has drifted from the canonical account it was
+    // mapped to — the mapping's justification (same verified email) no longer holds.
     expect(linkedIdentities.invalidate).toHaveBeenCalledWith("user_second_identity");
   });
 

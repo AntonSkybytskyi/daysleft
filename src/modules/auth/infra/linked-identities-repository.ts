@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, or } from "drizzle-orm";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import { linkedIdentities } from "@/db/schema";
 
@@ -20,7 +20,9 @@ export class LinkedIdentitiesRepository {
     await this.db.insert(linkedIdentities).values({ identityId, canonicalUserId }).onConflictDoNothing();
   }
 
-  async invalidate(identityId: string): Promise<void> {
-    await this.db.delete(linkedIdentities).where(eq(linkedIdentities.identityId, identityId));
+  async invalidate(clerkUserId: string): Promise<void> {
+    await this.db
+      .delete(linkedIdentities)
+      .where(or(eq(linkedIdentities.identityId, clerkUserId), eq(linkedIdentities.canonicalUserId, clerkUserId)));
   }
 }
