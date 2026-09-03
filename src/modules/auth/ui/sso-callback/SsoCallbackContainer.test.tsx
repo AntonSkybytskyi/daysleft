@@ -126,6 +126,30 @@ describe("SsoCallbackContainer — email-link flow", () => {
     expect(replace).not.toHaveBeenCalled();
   });
 
+  it("gives the sign-up branch's client_mismatch a truthful unconfirmed state and a non-destructive way back, not a false 'signed in' claim or a dead end", async () => {
+    const handleEmailLinkVerification = vi
+      .fn()
+      .mockRejectedValue(emailLinkError(EmailLinkErrorCodeStatus.ClientMismatch));
+    render(
+      <SsoCallbackContainer
+        returnTo="/dashboard"
+        flow="email_link"
+        isSignUp
+        deps={{ handleEmailLinkVerification } as never}
+      />,
+    );
+
+    // Unlike the sign-in branch, a sign-up attempt has no originating-device poll, so nothing
+    // here can honestly claim a session exists anywhere.
+    const alert = await screen.findByRole("alert");
+    expect(alert).not.toHaveTextContent(/signed in/i);
+    expect(screen.queryByRole("button", { name: /send a new link/i })).not.toBeInTheDocument();
+    expect(replace).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole("button", { name: "Back to login" }));
+    expect(replace).toHaveBeenCalledWith("/login");
+  });
+
   it("redirects to /login?error=sign_in_failed on a non-EmailLinkError rejection", async () => {
     const handleEmailLinkVerification = vi.fn().mockRejectedValue(new Error("network error"));
     render(
@@ -228,7 +252,10 @@ describe("SsoCallbackContainer — email-link flow", () => {
 
     await vi.waitFor(() => expect(signUpCreate).toHaveBeenCalledWith({ emailAddress: "traveler@example.test" }));
     expect(prepareEmailAddressVerification).toHaveBeenCalledWith(
-      expect.objectContaining({ strategy: "email_link" }),
+      // Marked distinctly from the sign-in branch's redirectUrl — a client_mismatch on this
+      // link can't be reported as a real success, since a sign-up attempt has no
+      // originating-device poll (see SsoCallbackContainer's isSignUp).
+      expect.objectContaining({ strategy: "email_link", redirectUrl: expect.stringContaining("signup=1") }),
     );
     expect(replace).toHaveBeenCalledWith(expect.stringContaining("/check-email"));
   });

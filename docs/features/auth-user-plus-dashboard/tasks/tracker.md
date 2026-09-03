@@ -76,7 +76,7 @@
 
 | T65 | Amend spec/SAD/UX-flows to state AC-02b's originating-device outcome | docs | Backend Lead | S | — | done |
 | T66 | Surface visible error instead of silent no-op when /check-email send guard fails | ui | Frontend Lead | S | T60 | done |
-| T67 | Non-destructive recovery CTA for sign-up branch's verified-elsewhere screen | ui | Frontend Lead | S | T60 | todo |
+| T67 | Non-destructive recovery CTA for sign-up branch's verified-elsewhere screen | ui | Frontend Lead | S | T60 | done |
 | T68 | Scope linked-identity invalidation to email changes + cover canonical-account side | data | Backend Lead | M | T62 | done |
 | T69 | Guard /check-email poll against cancellation/unmount races | ui | Frontend Lead | M | T60 | done (remount-resend guard not attempted — see commit body: no verifiable way to detect "already prepared" without clerk-js's un-bundled internal source; open question recorded) |
 | T70 | Fix CheckEmailContainer tests to match real Clerk SignInStatus contract + test single-send | tests | Frontend Lead | S | T60 | done |

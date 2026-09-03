@@ -5,7 +5,7 @@ import { DASHBOARD_PATH } from "@/modules/dashboard/app/get-dashboard";
 import { resolveStrings } from "./strings";
 
 type SsoCallbackPageProps = {
-  searchParams: { return_to?: string; flow?: string; email?: string };
+  searchParams: { return_to?: string; flow?: string; email?: string; signup?: string };
 };
 
 export default function SsoCallbackPage({ searchParams }: SsoCallbackPageProps) {
@@ -24,6 +24,7 @@ export default function SsoCallbackPage({ searchParams }: SsoCallbackPageProps) 
       returnTo={returnTo}
       flow={flow}
       email={searchParams.email}
+      isSignUp={searchParams.signup === "1"}
       strings={resolveStrings(acceptLanguage)}
     />
   );

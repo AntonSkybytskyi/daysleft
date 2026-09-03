@@ -46,4 +46,19 @@ describe("MagicLinkInvalidScreen", () => {
     // freshly-established session.
     expect(screen.queryByRole("button", { name: "Send a new link" })).not.toBeInTheDocument();
   });
+
+  it("verified-elsewhere-unconfirmed: a first-time sign-up's second device gets a non-destructive way back, not a false success claim or a dead end", async () => {
+    const onBackToLogin = vi.fn();
+    render(
+      <MagicLinkInvalidScreen state="verified-elsewhere-unconfirmed" onSendNewLink={vi.fn()} onBackToLogin={onBackToLogin} />,
+    );
+
+    // Unlike verified-elsewhere, this must NOT claim the Traveler is signed in — a first-time
+    // sign-up attempt has no poll anywhere, so nothing here can honestly confirm that.
+    expect(screen.getByRole("alert")).not.toHaveTextContent(/signed in/i);
+    expect(screen.queryByRole("button", { name: "Send a new link" })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Back to login" }));
+    expect(onBackToLogin).toHaveBeenCalledOnce();
+  });
 });

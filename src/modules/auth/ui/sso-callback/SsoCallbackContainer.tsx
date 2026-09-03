@@ -31,6 +31,12 @@ export type SsoCallbackContainerProps = {
   returnTo: string;
   flow?: "email_link" | "oauth";
   email?: string;
+  // True when the link being opened here belongs to a first-time sign-up attempt (the
+  // "?signup=1" marker CheckEmailContainer/LoginContainer/this container's own resend add to
+  // the redirectUrl for that branch). A sign-up attempt has no originating-device poll, so a
+  // client_mismatch/onVerifiedOnOtherDevice here can't be reported as a real success — see
+  // isSignUp's use below.
+  isSignUp?: boolean;
   deps?: SsoCallbackDeps;
   strings?: Partial<MagicLinkInvalidScreenStrings>;
 };
@@ -62,12 +68,21 @@ function isFormIdentifierNotFound(error: unknown): boolean {
   return Boolean(errors?.some((entry) => entry.code === "form_identifier_not_found"));
 }
 
-export function SsoCallbackContainer({ returnTo, flow = "oauth", email, deps, strings }: SsoCallbackContainerProps) {
+export function SsoCallbackContainer({
+  returnTo,
+  flow = "oauth",
+  email,
+  isSignUp = false,
+  deps,
+  strings,
+}: SsoCallbackContainerProps) {
   const router = useRouter();
   const clerk = useClerk();
   const { signIn } = useSignIn();
   const { signUp } = useSignUp();
-  const [screenState, setScreenState] = useState<"pending" | "invalid" | "verified-elsewhere">("pending");
+  const [screenState, setScreenState] = useState<
+    "pending" | "invalid" | "verified-elsewhere" | "verified-elsewhere-unconfirmed"
+  >("pending");
   const [resendState, setResendState] = useState<"idle" | "loading" | "error-rate-limited" | "error-sign-in-failed">(
     "idle",
   );
@@ -83,10 +98,10 @@ export function SsoCallbackContainer({ returnTo, flow = "oauth", email, deps, st
         // this callback — the sign-in completes over there (the originating device polls for it
         // via startEmailLinkFlow), not here, so this device must not navigate to returnTo, but it
         // also must not claim the link was invalid: it worked, just not on this browser.
-        onVerifiedOnOtherDevice: () => setScreenState("verified-elsewhere"),
+        onVerifiedOnOtherDevice: () => setScreenState(isSignUp ? "verified-elsewhere-unconfirmed" : "verified-elsewhere"),
       }).catch((error) => {
         if (isVerifiedElsewhereEmailLink(error)) {
-          setScreenState("verified-elsewhere");
+          setScreenState(isSignUp ? "verified-elsewhere-unconfirmed" : "verified-elsewhere");
           return;
         }
         if (isInvalidEmailLink(error)) {
@@ -117,6 +132,10 @@ export function SsoCallbackContainer({ returnTo, flow = "oauth", email, deps, st
     // createEmailLinkFlow, which also polls for cross-device completion (AC-02b).
     const sendMagicLink = deps?.sendMagicLink ?? ((opts) => signIn!.create({ identifier: opts.identifier }));
     const redirectUrl = `${window.location.origin}/sso-callback?return_to=${encodeURIComponent(returnTo)}&flow=email_link&email=${encodeURIComponent(email)}`;
+    // The sign-up branch has no originating-device poll, so a client_mismatch on this link
+    // can't be reported as a real success (see isSignUp above) — marked on its own redirectUrl,
+    // not the sign-in one above, since sendMagicLink's real signIn.create() doesn't take it.
+    const signUpRedirectUrl = `${redirectUrl}&signup=1`;
 
     const goToCheckEmail = () =>
       router.replace(`/check-email?email=${encodeURIComponent(email)}&return_to=${encodeURIComponent(returnTo)}`);
@@ -134,7 +153,7 @@ export function SsoCallbackContainer({ returnTo, flow = "oauth", email, deps, st
 
       try {
         await signUpClient.create({ emailAddress: email });
-        await signUpClient.prepareEmailAddressVerification({ strategy: "email_link", redirectUrl });
+        await signUpClient.prepareEmailAddressVerification({ strategy: "email_link", redirectUrl: signUpRedirectUrl });
         goToCheckEmail();
       } catch (signUpError) {
         setResendState(isRateLimited(signUpError) ? "error-rate-limited" : "error-sign-in-failed");
@@ -144,6 +163,20 @@ export function SsoCallbackContainer({ returnTo, flow = "oauth", email, deps, st
 
   if (screenState === "verified-elsewhere") {
     return <MagicLinkInvalidScreen state="verified-elsewhere" onSendNewLink={handleSendNewLink} strings={strings} />;
+  }
+
+  if (screenState === "verified-elsewhere-unconfirmed") {
+    // No destructive resend handle here — there is no established session anywhere for a
+    // sign-up attempt to supersede, but there's also nothing to confirm, so the only CTA is a
+    // non-destructive path back rather than the sign-in branch's resend.
+    return (
+      <MagicLinkInvalidScreen
+        state="verified-elsewhere-unconfirmed"
+        onSendNewLink={() => {}}
+        onBackToLogin={() => router.replace("/login")}
+        strings={strings}
+      />
+    );
   }
 
   if (screenState === "invalid") {

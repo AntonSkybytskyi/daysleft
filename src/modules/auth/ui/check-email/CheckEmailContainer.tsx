@@ -136,7 +136,10 @@ export function CheckEmailContainer({ email, returnTo, strings }: CheckEmailCont
 
     try {
       await signUp.create({ emailAddress: email });
-      await signUp.prepareEmailAddressVerification({ strategy: "email_link", redirectUrl });
+      // A sign-up attempt has no originating-device poll — mark the redirectUrl so a
+      // client_mismatch on this link (opened on a second device) isn't reported as a real
+      // success (see SsoCallbackContainer's isSignUp).
+      await signUp.prepareEmailAddressVerification({ strategy: "email_link", redirectUrl: `${redirectUrl}&signup=1` });
       setState("resent-confirmation");
     } catch (error) {
       setState(isRateLimited(error) ? "error-rate-limited" : "error-sign-in-failed");

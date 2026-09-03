@@ -65,7 +65,10 @@ export function LoginContainer({ heading, returnTo, initialState, strings }: Log
 
     try {
       await signUp.create({ emailAddress: email });
-      await signUp.prepareEmailAddressVerification({ strategy: "email_link", redirectUrl });
+      // A sign-up attempt has no originating-device poll — mark the redirectUrl so a
+      // client_mismatch on this link (opened on a second device) isn't reported as a real
+      // success (see SsoCallbackContainer's isSignUp).
+      await signUp.prepareEmailAddressVerification({ strategy: "email_link", redirectUrl: `${redirectUrl}&signup=1` });
       router.push(`/check-email?email=${encodeURIComponent(email)}&return_to=${encodeURIComponent(returnTo)}`);
     } catch {
       setState("error-sign-in-failed");
