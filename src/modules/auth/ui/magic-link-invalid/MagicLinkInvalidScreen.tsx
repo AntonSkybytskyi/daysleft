@@ -38,7 +38,10 @@ const defaultStrings: MagicLinkInvalidScreenStrings = {
 
 export type MagicLinkInvalidScreenProps = {
   state: MagicLinkInvalidScreenState;
-  onSendNewLink: () => void;
+  // Only rendered by "default"/"loading"/"error-*" — neither "verified-elsewhere" state has a
+  // resend CTA (nothing to supersede in one case, nothing safe to offer in the other), so the
+  // handle stays unreachable rather than merely unrendered.
+  onSendNewLink?: () => void;
   onBackToLogin?: () => void;
   strings?: Partial<MagicLinkInvalidScreenStrings>;
 };

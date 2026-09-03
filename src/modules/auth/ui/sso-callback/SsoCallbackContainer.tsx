@@ -162,17 +162,19 @@ export function SsoCallbackContainer({
   };
 
   if (screenState === "verified-elsewhere") {
-    return <MagicLinkInvalidScreen state="verified-elsewhere" onSendNewLink={handleSendNewLink} strings={strings} />;
+    // No resend handle passed at all — a future edit adding a button to this branch would find
+    // no handler wired, rather than silently re-arming the session-superseding resend round 4
+    // removed.
+    return <MagicLinkInvalidScreen state="verified-elsewhere" strings={strings} />;
   }
 
   if (screenState === "verified-elsewhere-unconfirmed") {
-    // No destructive resend handle here — there is no established session anywhere for a
-    // sign-up attempt to supersede, but there's also nothing to confirm, so the only CTA is a
-    // non-destructive path back rather than the sign-in branch's resend.
+    // Same reasoning: no destructive resend handle here — there is no established session
+    // anywhere for a sign-up attempt to supersede, but there's also nothing to confirm, so the
+    // only CTA is a non-destructive path back.
     return (
       <MagicLinkInvalidScreen
         state="verified-elsewhere-unconfirmed"
-        onSendNewLink={() => {}}
         onBackToLogin={() => router.replace("/login")}
         strings={strings}
       />

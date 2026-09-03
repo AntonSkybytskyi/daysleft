@@ -71,17 +71,32 @@ afterEach(async () => {
   await client.close();
 });
 
+const noopLinkedIdentities = {
+  findCanonicalUserId: () => Promise.resolve(null),
+  invalidate: () => Promise.resolve(undefined),
+};
+
 describe("QG-1 security scenarios (sad.md §10)", () => {
   it("(a) two sign-ins with the same verified email via different methods resolve to one account", async () => {
     const sharedEmail = "traveler@example.test";
 
     const first = await handleClerkWebhook(
       { headers, rawBody: eventPayload("user_via_google", sharedEmail) },
-      { webhookSecret, repository, verify: () => verifyOk(eventPayload("user_via_google", sharedEmail)) },
+      {
+        webhookSecret,
+        repository,
+        verify: () => verifyOk(eventPayload("user_via_google", sharedEmail)),
+        linkedIdentities: noopLinkedIdentities,
+      },
     );
     const second = await handleClerkWebhook(
       { headers, rawBody: eventPayload("user_via_magic_link", sharedEmail) },
-      { webhookSecret, repository, verify: () => verifyOk(eventPayload("user_via_magic_link", sharedEmail)) },
+      {
+        webhookSecret,
+        repository,
+        verify: () => verifyOk(eventPayload("user_via_magic_link", sharedEmail)),
+        linkedIdentities: noopLinkedIdentities,
+      },
     );
 
     expect(first.status).toBe(200);

@@ -1,6 +1,5 @@
 "use client";
 
-import { useClerk } from "@clerk/nextjs";
 import { useSignIn, useSignUp } from "@clerk/nextjs/legacy";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { useRouter } from "next/navigation";
@@ -41,8 +40,7 @@ type PollHandle = { cancelled: boolean; cancel: () => void };
 
 export function CheckEmailContainer({ email, returnTo, strings }: CheckEmailContainerProps) {
   const router = useRouter();
-  const { setActive } = useClerk();
-  const { signIn, isLoaded } = useSignIn();
+  const { signIn, isLoaded, setActive } = useSignIn();
   const { signUp, isLoaded: isSignUpLoaded } = useSignUp();
   const [state, setState] = useState<CheckEmailScreenState>("default");
   const activePollRef = useRef<PollHandle | null>(null);
@@ -83,7 +81,9 @@ export function CheckEmailContainer({ email, returnTo, strings }: CheckEmailCont
           return;
         }
         if (result.status === "complete" && result.createdSessionId) {
-          await setActive({ session: result.createdSessionId });
+          // setActive is only undefined while !isLoaded, which pollForCompletion is never
+          // invoked under (guarded at both call sites: the mount effect and handleResend).
+          await setActive!({ session: result.createdSessionId });
           router.replace(returnTo);
           return;
         }

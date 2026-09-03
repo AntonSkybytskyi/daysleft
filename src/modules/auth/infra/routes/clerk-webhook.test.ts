@@ -16,6 +16,10 @@ function fakeRepository(overrides?: Partial<UsersRepository>): UsersRepository {
   } as unknown as UsersRepository;
 }
 
+function fakeLinkedIdentities() {
+  return { invalidate: vi.fn().mockResolvedValue(undefined), findCanonicalUserId: vi.fn().mockResolvedValue(null) };
+}
+
 function eventPayload(overrides?: { verified?: boolean; email?: string; id?: string }) {
   return JSON.stringify({
     type: "user.created",
@@ -40,7 +44,7 @@ describe("handleClerkWebhook", () => {
 
     const result = await handleClerkWebhook(
       { headers: validHeaders, rawBody: eventPayload() },
-      { webhookSecret, repository, verify },
+      { webhookSecret, repository, verify, linkedIdentities: fakeLinkedIdentities() },
     );
 
     expect(result.status).toBe(200);
@@ -53,7 +57,7 @@ describe("handleClerkWebhook", () => {
 
     const result = await handleClerkWebhook(
       { headers: validHeaders, rawBody: eventPayload() },
-      { webhookSecret, repository, verify },
+      { webhookSecret, repository, verify, linkedIdentities: fakeLinkedIdentities() },
     );
 
     expect(result).toEqual({
@@ -70,7 +74,7 @@ describe("handleClerkWebhook", () => {
 
     const result = await handleClerkWebhook(
       { headers: validHeaders, rawBody: payload },
-      { webhookSecret, repository, verify },
+      { webhookSecret, repository, verify, linkedIdentities: fakeLinkedIdentities() },
     );
 
     expect(result).toEqual({
@@ -88,7 +92,7 @@ describe("handleClerkWebhook", () => {
 
     const result = await handleClerkWebhook(
       { headers: validHeaders, rawBody: eventPayload() },
-      { webhookSecret, repository, verify },
+      { webhookSecret, repository, verify, linkedIdentities: fakeLinkedIdentities() },
     );
 
     expect(result).toEqual({
@@ -105,7 +109,7 @@ describe("handleClerkWebhook", () => {
     const payload = JSON.stringify({ type: "session.created", data: { id: "sess_1" } });
     const verify = vi.fn().mockReturnValue({ valid: true, event: JSON.parse(payload) });
 
-    const result = await handleClerkWebhook({ headers: validHeaders, rawBody: payload }, { webhookSecret, repository, verify });
+    const result = await handleClerkWebhook({ headers: validHeaders, rawBody: payload }, { webhookSecret, repository, verify, linkedIdentities: fakeLinkedIdentities() });
 
     expect(result.status).toBe(200);
     expect(repository.upsertById).not.toHaveBeenCalled();
@@ -117,7 +121,7 @@ describe("handleClerkWebhook", () => {
     const payload = JSON.stringify({ type: "user.deleted", data: { id: "user_1", deleted: true } });
     const verify = vi.fn().mockReturnValue({ valid: true, event: JSON.parse(payload) });
 
-    const result = await handleClerkWebhook({ headers: validHeaders, rawBody: payload }, { webhookSecret, repository, verify });
+    const result = await handleClerkWebhook({ headers: validHeaders, rawBody: payload }, { webhookSecret, repository, verify, linkedIdentities: fakeLinkedIdentities() });
 
     expect(result.status).toBe(200);
     expect(repository.upsertById).not.toHaveBeenCalled();
@@ -134,7 +138,7 @@ describe("handleClerkWebhook", () => {
     });
     const verify = vi.fn().mockReturnValue({ valid: true, event: JSON.parse(payload) });
 
-    const result = await handleClerkWebhook({ headers: validHeaders, rawBody: payload }, { webhookSecret, repository, verify });
+    const result = await handleClerkWebhook({ headers: validHeaders, rawBody: payload }, { webhookSecret, repository, verify, linkedIdentities: fakeLinkedIdentities() });
 
     expect(result).toEqual({
       status: 422,
@@ -149,11 +153,11 @@ describe("handleClerkWebhook", () => {
 
     const first = await handleClerkWebhook(
       { headers: validHeaders, rawBody: eventPayload() },
-      { webhookSecret, repository, verify, dedupeStore },
+      { webhookSecret, repository, verify, dedupeStore, linkedIdentities: fakeLinkedIdentities() },
     );
     const second = await handleClerkWebhook(
       { headers: validHeaders, rawBody: eventPayload() },
-      { webhookSecret, repository, verify, dedupeStore },
+      { webhookSecret, repository, verify, dedupeStore, linkedIdentities: fakeLinkedIdentities() },
     );
 
     expect(first.status).toBe(200);
@@ -168,7 +172,7 @@ describe("handleClerkWebhook", () => {
 
     await handleClerkWebhook(
       { headers: validHeaders, rawBody: eventPayload() },
-      { webhookSecret, repository, verify, dedupeStore },
+      { webhookSecret, repository, verify, dedupeStore, linkedIdentities: fakeLinkedIdentities() },
     );
 
     // An attacker replaying the same svix-id with a body/signature that no longer verifies must
@@ -176,7 +180,7 @@ describe("handleClerkWebhook", () => {
     const forgedVerify = vi.fn().mockReturnValue({ valid: false });
     const replayed = await handleClerkWebhook(
       { headers: validHeaders, rawBody: eventPayload() },
-      { webhookSecret, repository, verify: forgedVerify, dedupeStore },
+      { webhookSecret, repository, verify: forgedVerify, dedupeStore, linkedIdentities: fakeLinkedIdentities() },
     );
 
     expect(replayed.status).toBe(401);
@@ -193,11 +197,11 @@ describe("handleClerkWebhook", () => {
 
     await handleClerkWebhook(
       { headers: validHeaders, rawBody: eventPayload() },
-      { webhookSecret, repository, verify, dedupeStore },
+      { webhookSecret, repository, verify, dedupeStore, linkedIdentities: fakeLinkedIdentities() },
     );
     const second = await handleClerkWebhook(
       { headers: validHeaders, rawBody: eventPayload() },
-      { webhookSecret, repository, verify, dedupeStore },
+      { webhookSecret, repository, verify, dedupeStore, linkedIdentities: fakeLinkedIdentities() },
     );
 
     expect(JSON.stringify(second.body)).not.toContain("traveler@example.test");

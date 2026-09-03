@@ -29,15 +29,12 @@ vi.mock("@clerk/nextjs/legacy", () => ({
   useSignIn: () => ({
     isLoaded: true,
     signIn: signInValue,
+    setActive,
   }),
   useSignUp: () => ({
     isLoaded: true,
     signUp: { create: signUpCreate, prepareEmailAddressVerification: signUpPrepareEmailAddressVerification },
   }),
-}));
-
-vi.mock("@clerk/nextjs", () => ({
-  useClerk: () => ({ setActive }),
 }));
 
 vi.mock("next/navigation", () => ({
