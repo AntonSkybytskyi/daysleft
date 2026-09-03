@@ -29,11 +29,12 @@ The dashboard's days-left summary is fetched with a hand-rolled `fetch` in a cli
 1. **TanStack Query** — a dedicated client-side query/cache library with per-query configuration (staleTime, gcTime, refetch triggers, retry) granular enough to disable every automatic-refetch trigger individually.
 2. **SWR** — a comparable client-side fetch/cache library with a similar configuration surface (`revalidateOnFocus`, `revalidateOnReconnect`, `shouldRetryOnError`).
 3. **Hand-rolled cache** — keep the existing `useEffect`+`fetch` pattern, adding a small in-module cache/dedup mechanism by hand.
-4. **RSC-only (server-rendered, no client cache)** — convert the dashboard to server-side rendering instead of adding a client cache.
+
+Converting the dashboard to server-side rendering instead of adding a client cache was not a real fourth option here: spec §3 already excludes it as a non-goal (the dashboard's data is still a hardcoded placeholder, and this pass deliberately proves the pattern on the lowest-risk request first — spec §1), so it was never weighed against the three above.
 
 ## Decision outcome
 
-**Chosen:** Option 1, TanStack Query, configured with `staleTime`/`gcTime` unbounded for the page's lifetime, `refetchOnWindowFocus: false`, `refetchOnReconnect: false`, and `retry: false` (one explicit, user-triggered retry control instead — spec §5 AC-02). Chosen over SWR because it was named as the intended library in the originating feature idea and offers the same fine-grained control needed here; over the hand-rolled cache because de-duplication/cache-lifecycle bugs are exactly the class of bug a mature library already solved; over RSC-only because converting to server-side rendering is an explicit spec non-goal (spec §3) — the dashboard's data is still a hardcoded placeholder, and this pass deliberately proves the pattern on the lowest-risk request first (spec §1).
+**Chosen:** Option 1, TanStack Query, configured with `staleTime`/`gcTime` unbounded for the page's lifetime, `refetchOnWindowFocus: false`, `refetchOnReconnect: false`, and `retry: false` (one explicit, user-triggered retry control instead — spec §5 AC-02). Chosen over SWR because it was named as the intended library in the originating feature idea and offers the same fine-grained control needed here; over the hand-rolled cache because de-duplication/cache-lifecycle bugs are exactly the class of bug a mature library already solved.
 
 ## Consequences
 

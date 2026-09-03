@@ -105,10 +105,10 @@ src/
 └── modules/
     └── dashboard/
         ├── ui/
-        │   ├── DashboardContainer.tsx   # migrated from useEffect+fetch to the query hook
-        │   └── dashboard-query.ts       # the dashboard query's key, fetcher, and conservative options
+        │   └── DashboardContainer.tsx   # migrated from useEffect+fetch to the query hook
         └── app/
-            └── get-dashboard.ts         # unchanged — existing handler, no contract change
+            ├── get-dashboard.ts         # unchanged — existing handler, no contract change
+            └── dashboard-query.ts       # the dashboard query's key, fetcher, and conservative options — app logic, not UI
 ```
 
 **C4 Container (L2):**
@@ -166,7 +166,27 @@ sequenceDiagram
     end
 ```
 
-The `sequences` stage covers every §5 AC branch (the recoverable-error path, the logout/re-sign-in flow) in full; this seed shows the primary happy path plus the cache-hit and session-invalid branches spec §5 AC-01/AC-03 demand.
+**Critical flow 2: Logout clears the cache for the next Traveler (ADR-0002)**
+
+```mermaid
+sequenceDiagram
+    actor TravelerA as Traveler A
+    participant Web
+    participant API
+    actor TravelerB as Traveler B
+
+    TravelerA->>Web: logs out
+    Web->>API: sends the logout request
+    API-->>Web: confirms the session was revoked
+    Web->>Web: clears the cache entry keyed to Traveler A's identity
+    Web-->>TravelerA: client-side sign-out (may succeed or fail independently)
+    TravelerB->>Web: signs in on the same device
+    Web->>API: requests the dashboard summary, keyed to Traveler B's identity
+    API-->>Web: Traveler B's own summary
+    Web-->>TravelerB: renders Traveler B's summary — never Traveler A's cached entry
+```
+
+This is where ADR-0002's identity-scoping decision actually lives: even if the clear in step 4 and Traveler B's sign-in raced, Traveler B's fetch is keyed to a different identity and could never read Traveler A's entry. The `sequences` stage covers every remaining §5 AC branch (the recoverable-error/retry path) in full; these two seeds carry the flows behind QG-1/QG-2 (flow 1) and QG-3 (flow 2).
 
 ## 7. Deployment view
 
@@ -202,8 +222,8 @@ ADR files live under `docs/features/fetch-with-tanstack-query/adr/`.
 
 **QG-2. Responsiveness / duplicate-fetch avoidance**
 - **When:** a Traveler revisits the dashboard within the same page load while still signed in
-- **Then:** 0 extra network calls per revisit within the same page load, for as long as the Traveler stays signed in — a reload starts fresh (spec §6 "Duplicate-fetch avoidance", verbatim); latency p95 on the dashboard's first load ≤ 500 ms (spec §6 row 1, verbatim)
-- **How verify:** test assertion in CI pinning the fetch call count across a repeat mount/focus; test assertion in CI for the latency target (spec §6 measurement)
+- **Then:** 0 extra network calls per revisit within the same page load, for as long as the Traveler stays signed in — a reload starts fresh (spec §6 "Duplicate-fetch avoidance", verbatim); latency p95 on the dashboard's first load ≤ 500 ms (spec §6 row 1, verbatim); the cached entry is never evicted or treated as stale before sign-out or page unload — no time-based expiry (spec §6 "Cache retention", verbatim)
+- **How verify:** test assertion in CI pinning the fetch call count across a repeat mount/focus; test assertion in CI for the latency target; test assertion in CI for the retention rule (staleTime/gcTime configuration + a repeat-access test) (spec §6 measurements)
 
 **QG-3. Cached-PII security across the identity boundary**
 - **When:** a Traveler logs out and a different Traveler subsequently signs in on the same device
@@ -212,12 +232,12 @@ ADR files live under `docs/features/fetch-with-tanstack-query/adr/`.
 
 ## 11. Risks and technical debt
 
-| Risk / debt | Severity | Mitigation | Owner |
-|---|---|---|---|
-| Stale-authorization display: with auto-revalidation disabled, cached summary data keeps rendering after a session is invalidated elsewhere until the Traveler triggers a real fetch again | Medium | Accepted and bounded by spec AC-03 — any actual fetch always re-checks the session; no cached data is ever served as if still valid | Backend Lead |
-| The dashboard endpoint's one-time `linked` flag stays fragile (only true on the first read) rather than persisted server-side | Low | Constrained via ADR-0001's conservative refetch config for this pass; revisit if the endpoint is changed to persist linked state | Backend Lead |
-| Open architectural decision: should the endpoint persist `linked` state instead of a one-shot flag, so automatic revalidation can be safely enabled later? | Open question | Resolve before any future feature proposes enabling auto-refetch (spec §8 OQ2) | Backend Lead |
-| Open architectural decision: should a shared query-key convention/registry be defined before a second module adopts this pattern? | Open question | Resolve before the next feature adds a second cached query (spec §8 OQ1); ADR-0001 documents the convention in prose only for now | Tech Lead |
+| Risk / debt | Severity | Mitigation | Owner | Due |
+|---|---|---|---|---|
+| Stale-authorization display: with auto-revalidation disabled, cached summary data keeps rendering after a session is invalidated elsewhere until the Traveler triggers a real fetch again | Medium | Accepted and bounded by spec AC-03 — any actual fetch always re-checks the session; no cached data is ever served as if still valid | Backend Lead | — (accepted, not scheduled) |
+| The dashboard endpoint's one-time `linked` flag stays fragile (only true on the first read) rather than persisted server-side | Low | Constrained via ADR-0001's conservative refetch config for this pass; revisit if the endpoint is changed to persist linked state | Backend Lead | — (accepted, not scheduled) |
+| Open architectural decision: should the endpoint persist `linked` state instead of a one-shot flag, so automatic revalidation can be safely enabled later? | Open question | See spec §8 OQ2 | Backend Lead | Before any future feature proposes enabling auto-refetch |
+| Open architectural decision: should a shared query-key convention/registry be defined before a second module adopts this pattern? | Open question | See spec §8 OQ1; ADR-0002's Neutral consequence notes the same gap for identity-scoped keys specifically | Tech Lead | Before the next feature adds a second cached query |
 
 **Accepted debt (acceptable in v1, plan to fix later):**
 - The one-shot `linked` flag's fragility is worked around client-side (persisting the shown-confirmation state across fetches) rather than fixed server-side — acceptable because the underlying write is already safe to repeat (spec §1); revisit per the open question above.
