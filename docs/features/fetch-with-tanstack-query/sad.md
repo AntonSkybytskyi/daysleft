@@ -186,7 +186,59 @@ sequenceDiagram
     Web-->>TravelerB: renders Traveler B's summary — never Traveler A's cached entry
 ```
 
-This is where ADR-0002's identity-scoping decision actually lives: even if the clear in step 4 and Traveler B's sign-in raced, Traveler B's fetch is keyed to a different identity and could never read Traveler A's entry. The `sequences` stage covers every remaining §5 AC branch (the recoverable-error/retry path) in full; these two seeds carry the flows behind QG-1/QG-2 (flow 1) and QG-3 (flow 2).
+This is where ADR-0002's identity-scoping decision actually lives: even if the clear in step 4 and Traveler B's sign-in raced, Traveler B's fetch is keyed to a different identity and could never read Traveler A's entry.
+
+**Critical flow 3: Recover from a fetch failure and retry**
+
+```mermaid
+sequenceDiagram
+    actor Traveler
+    participant Web
+    participant API
+
+    Traveler->>Web: opens or revisits the dashboard (cache miss)
+    Web-->>Traveler: shows a loading indicator
+    Web->>API: requests the dashboard summary
+    API-->>Web: fetch fails (no connectivity, a server-side error, a timeout, or an unreadable response — not a confirmed invalid-session signal)
+    Web-->>Traveler: shows a recoverable error with one retry control, no automatic retry
+    Traveler->>Web: triggers the retry control
+    Web-->>Traveler: shows a loading indicator again
+    Web->>API: requests the dashboard summary again
+    API-->>Web: succeeds this time (the linked indicator now reads false — already consumed on an earlier read)
+    alt confirmation was already shown earlier this session
+        Web-->>Traveler: renders the summary, keeps the earlier confirmation visible — not retracted, not re-run
+    else confirmation was never shown before
+        Web-->>Traveler: renders the summary, no confirmation
+    end
+```
+
+The Traveler's first fetch fails for a reason other than a confirmed invalid session — network, server, timeout, or an unreadable response — and sees a recoverable error with a single retry control they must trigger themselves; nothing retries automatically. Triggering it shows the loading indicator again and re-fetches. If the Traveler's linked-account confirmation was already shown earlier this session, it stays visible even though this retry's response no longer carries the flag — the confirmation is never silently retracted by a later fetch.
+
+Together, the three flows carry QG-1 and part of QG-2 (flow 1), QG-3 (flow 2), and the rest of QG-1/QG-2 plus the error/retry path (flow 3).
+
+**Coverage.**
+
+Every spec §4 user story maps to at least one flow:
+
+| User story | Flow(s) |
+|---|---|
+| US-01 (avoid duplicate fetches) | Flow 1 — cache-hit branch |
+| US-02 (clear loading state) | Flow 1 — cache-miss branch (implicit); Flow 3 — explicit loading steps |
+| US-03 (recover from a network error) | Flow 3 |
+| US-04 (sent to sign in on session expiry) | Flow 1 — session-invalid branch |
+| US-05 (never see another account's dashboard) | Flow 2 |
+| US-06 (linked-confirmation trustworthy) | Flow 1 — success branch; Flow 3 — durability `alt` branch |
+
+Every spec §5 acceptance criterion is shown by a flow or an explicit branch — none is runtime-N/A:
+
+| AC | Shown by |
+|---|---|
+| AC-01 (happy) | Flow 1, "cache hit" branch |
+| AC-02 (error) | Flow 3, main path |
+| AC-03 (authorization) | Flow 1, "session invalid" branch |
+| AC-04 (domain invariant) | Flow 1, success branch (confirmation shown); Flow 3, `alt` branch (confirmation survives a retry) |
+| AC-05 (cross-context) | Flow 2, entire flow |
+| AC-06 (happy — loading state) | Flow 1, cache-miss branch (implicit); Flow 3, explicit loading steps |
 
 ## 7. Deployment view
 
