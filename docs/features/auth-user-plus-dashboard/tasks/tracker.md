@@ -36,7 +36,7 @@
 | T28 | Thread real return-to path (dashboard 401 + container) | app | Backend Lead | S | — | done |
 | T29 | Webhook event-type guard + try/catch | infra | Backend Lead | S | T26, T27 | todo |
 | T30 | AppError + unified error envelope | app | Backend Lead | M | — | done |
-| T31 | Postgres client singleton + env validation | infra | Backend Lead | S | — | todo |
+| T31 | Postgres client singleton + env validation | infra | Backend Lead | S | — | done |
 | T32 | Magic-link sign-up fallback | ui | Frontend Lead | S | — | todo |
 | T33 | Swap hand-rolled Svix verify for Clerk SDK helper | infra | Backend Lead | S | T29 | todo |
 | T34 | Move return-to validation into auth module | wiring | Backend Lead | S | T18, T28 | todo |

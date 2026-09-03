@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
       "svix-signature": request.headers.get("svix-signature") ?? "",
     };
 
-    const db = createDbClient(process.env.DATABASE_URL ?? "");
+    const db = createDbClient();
     const repository = new UsersRepository(db);
 
     const result = await handleClerkWebhook(

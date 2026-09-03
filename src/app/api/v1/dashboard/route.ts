@@ -7,7 +7,7 @@ import { mapUnknownError, toErrorEnvelope } from "@/lib/errors";
 
 export async function GET(request: NextRequest) {
   try {
-    const db = createDbClient(process.env.DATABASE_URL ?? "");
+    const db = createDbClient();
     const rawPath = request.nextUrl.searchParams.get("path");
     const requestedPath = rawPath ? resolveReturnTo(rawPath, request.nextUrl.origin) : undefined;
     const result = await getDashboard(buildSessionDeps(db), requestedPath);
