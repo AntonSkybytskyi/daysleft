@@ -42,7 +42,7 @@ export async function handleClerkWebhook(
   }
 
   const verify = deps.verify ?? verifyClerkWebhook;
-  const verification = verify(request.rawBody, request.headers, deps.webhookSecret);
+  const verification = await verify(request.rawBody, request.headers, deps.webhookSecret);
 
   if (!verification.valid) {
     return {

@@ -1,4 +1,5 @@
-import { Webhook } from "svix";
+import { verifyWebhook } from "@clerk/nextjs/webhooks";
+import { NextRequest } from "next/server";
 
 export type ClerkWebhookHeaders = {
   "svix-id": string;
@@ -8,20 +9,22 @@ export type ClerkWebhookHeaders = {
 
 export type ClerkWebhookEvent = { type: string; data: Record<string, unknown> };
 
-export type VerifyResult =
-  | { valid: true; event: ClerkWebhookEvent }
-  | { valid: false };
+export type VerifyResult = { valid: true; event: ClerkWebhookEvent } | { valid: false };
 
-export function verifyClerkWebhook(
+export async function verifyClerkWebhook(
   payload: string,
   headers: ClerkWebhookHeaders,
   webhookSecret: string,
-): VerifyResult {
-  const webhook = new Webhook(webhookSecret);
+): Promise<VerifyResult> {
+  const request = new NextRequest("https://clerk.webhook.local/webhooks/clerk", {
+    method: "POST",
+    headers,
+    body: payload,
+  });
 
   try {
-    webhook.verify(payload, headers);
-    return { valid: true, event: JSON.parse(payload) as ClerkWebhookEvent };
+    const event = await verifyWebhook(request, { signingSecret: webhookSecret });
+    return { valid: true, event: event as unknown as ClerkWebhookEvent };
   } catch {
     return { valid: false };
   }

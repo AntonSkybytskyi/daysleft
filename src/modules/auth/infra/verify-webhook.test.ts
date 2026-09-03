@@ -15,21 +15,22 @@ function sign(payload: string, msgId: string, timestamp: Date) {
 }
 
 describe("verifyClerkWebhook", () => {
-  it("verifies a validly-signed payload and returns the parsed event", () => {
+  it("verifies a validly-signed payload and returns the parsed event", async () => {
     const payload = JSON.stringify({ type: "user.created", data: { id: "user_123" } });
     const headers = sign(payload, "msg_1", new Date());
 
-    const result = verifyClerkWebhook(payload, headers, secret);
+    const result = await verifyClerkWebhook(payload, headers, secret);
 
-    expect(result).toEqual({ valid: true, event: { type: "user.created", data: { id: "user_123" } } });
+    expect(result.valid).toBe(true);
+    expect(result).toMatchObject({ event: { type: "user.created", data: { id: "user_123" } } });
   });
 
-  it("rejects a tampered payload", () => {
+  it("rejects a tampered payload", async () => {
     const payload = JSON.stringify({ type: "user.created", data: { id: "user_123" } });
     const headers = sign(payload, "msg_2", new Date());
     const tamperedPayload = JSON.stringify({ type: "user.created", data: { id: "user_999" } });
 
-    const result = verifyClerkWebhook(tamperedPayload, headers, secret);
+    const result = await verifyClerkWebhook(tamperedPayload, headers, secret);
 
     expect(result).toEqual({ valid: false });
   });

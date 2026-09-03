@@ -13,7 +13,7 @@ import { resolveLoginReturnTo } from "@/modules/dashboard/app/return-to";
 
 const webhookSecret = "whsec_test_secret";
 
-function verifyOk(rawBody: string) {
+async function verifyOk(rawBody: string) {
   return { valid: true as const, event: JSON.parse(rawBody) };
 }
 
