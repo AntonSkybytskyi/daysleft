@@ -1,0 +1,224 @@
+openapi: 3.1.0
+
+info:
+  title: auth-user-plus-dashboard API
+  version: 0.1.0
+  description: |
+    Backs the first user-facing vertical slice of daysleft: passwordless account creation
+    (Google/GitHub OAuth or magic-link email, via Clerk) with account-linking by verified email,
+    a session-gated dashboard shell, and complete server-side logout. OAuth/magic-link initiation
+    and consent are handled entirely by Clerk's hosted UI (this API is never called to start a
+    sign-in) — this contract covers only the two operations daysleft's own backend performs: the
+    account-sync webhook and the session-gated dashboard/logout surface.
+
+servers:
+  - url: https://api.example.com
+    description: Production
+  - url: http://localhost
+    description: Local
+
+security:
+  - BearerAuth: []
+
+paths:
+  /webhooks/clerk:
+    post:
+      summary: Sync a Clerk account event into the local users shadow table
+      operationId: handleClerkWebhook
+      security: []
+      description: |
+        Inbound webhook from Clerk (an external system, sad.md §3/§4 ADR-0001), not a client
+        request — verified via Svix signature headers, not BearerAuth. Deduplicated on
+        `svix-id` in place of the generic client-generated Idempotency-Key header, since the
+        caller is Clerk's fixed webhook dispatcher, not a controllable API client.
+      parameters:
+        - in: header
+          name: svix-id
+          required: true
+          description: Clerk/Svix delivery id — used as the dedupe key (a redelivery carries the same id)
+          schema: { type: string }
+        - in: header
+          name: svix-timestamp
+          required: true
+          schema: { type: string }
+        - in: header
+          name: svix-signature
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ClerkWebhookEvent" }
+            example:
+              type: user.created
+              data:
+                id: "user_2sZ1example"
+                email_addresses:
+                  - email_address: "traveler@example.test"
+                    verification: { status: verified }
+      responses:
+        "200":
+          description: users row created or updated (sad.md §6 flows 1, 3, 4 — matched by verified email)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "401":
+          description: Svix signature verification failed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example:
+                code: "auth.webhook_invalid_signature"
+                message: "Webhook signature verification failed."
+        "422":
+          description: no verified email in the payload — account creation/linking blocked (sad.md §6 flow 4)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example:
+                code: "auth.email_required"
+                message: "A verified email is required to create or link an account."
+
+  /api/v1/dashboard:
+    get:
+      summary: Fetch the session-gated dashboard shell
+      operationId: getDashboard
+      security:
+        - SessionAuth: []
+      responses:
+        "200":
+          description: OK — empty-state shell (sad.md §6 flow 1, US-06)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DashboardData" }
+              example:
+                user: { id: "user_2sZ1example", email: "traveler@example.test" }
+                has_trips: false
+        "401":
+          description: |
+            No session, or an expired/invalid one — no account or dashboard data is revealed
+            (sad.md §6 flows 6, 7). `details.return_to` carries the originally requested path so
+            the client can round-trip it through Clerk's hosted login and land back here (AC-04).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example:
+                code: "auth.session_invalid"
+                message: "Sign in to view your dashboard."
+                details:
+                  return_to: "/dashboard"
+
+  /api/v1/auth/logout:
+    post:
+      summary: End the Traveler's session on this browser, server-side
+      operationId: logout
+      security:
+        - SessionAuth: []
+      responses:
+        "204":
+          description: session revoked server-side (sad.md §6 flow 7, AC-06); other devices unaffected
+        "401":
+          description: no active session to log out of
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example:
+                code: "auth.session_invalid"
+                message: "No active session."
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    SessionAuth:
+      type: apiKey
+      in: cookie
+      name: __session
+      description: |
+        Clerk-issued session cookie, verified server-side via the Clerk SDK (sad.md §8
+        Authentication). Deviation from the template's BearerAuth default, justified by
+        ADR-0001 — Clerk manages sessions as cookies for this same-origin web app, not as
+        client-supplied bearer tokens. BearerAuth is kept as the documented global default for
+        any future machine-to-machine endpoint this feature does not itself add.
+
+  responses:
+    Error:
+      description: Error — unified envelope
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    Error:
+      type: object
+      required: [code, message]
+      additionalProperties: false
+      properties:
+        code:
+          type: string
+          pattern: "^[a-z_]+\\.[a-z_]+$"
+          example: "auth.session_invalid"
+        message: { type: string }
+        details:
+          type: object
+          description: optional structured context (e.g. return_to for a 401 on the dashboard)
+
+    # Traces to data-model.md `users` (id = Clerk-issued id, email verified+unique).
+    User:
+      type: object
+      required: [id, email]
+      additionalProperties: false
+      properties:
+        id: { type: string, description: "Clerk-issued user id (data-model.md users.id)" }
+        email: { type: string, format: email }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    UserSummary:
+      type: object
+      required: [id, email]
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        email: { type: string, format: email }
+
+    DashboardData:
+      type: object
+      required: [user, has_trips]
+      additionalProperties: false
+      properties:
+        user: { $ref: "#/components/schemas/UserSummary" }
+        has_trips:
+          type: boolean
+          description: >-
+            Hardcoded false in this slice (spec §3 non-goal: populated dashboard content is out
+            of scope — no trips table exists yet, AC-07). Becomes a real query once `trips` ships.
+
+    # Shape dictated by Clerk (external system, ADR-0001) — not a data-model.md entity.
+    ClerkWebhookEvent:
+      type: object
+      required: [type, data]
+      additionalProperties: true
+      properties:
+        type:
+          type: string
+          enum: [user.created, user.updated]
+        data:
+          type: object
+          required: [id, email_addresses]
+          properties:
+            id: { type: string }
+            email_addresses:
+              type: array
+              items:
+                type: object
+                required: [email_address, verification]
+                properties:
+                  email_address: { type: string, format: email }
+                  verification:
+                    type: object
+                    properties:
+                      status: { type: string, enum: [verified, unverified] }
