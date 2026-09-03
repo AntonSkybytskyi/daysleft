@@ -14,7 +14,16 @@ export function resolveReturnTo(rawReturnTo: string | null, requestOrigin: strin
     return defaultPath;
   }
 
-  return `${resolved.pathname}${resolved.search}${resolved.hash}`;
+  const path = `${resolved.pathname}${resolved.search}${resolved.hash}`;
+
+  // A same-origin check on `resolved.origin` isn't enough on its own: dot-segment normalisation
+  // (e.g. "/..//evil.example/x") can produce a pathname starting with "//", which a browser
+  // treats as a protocol-relative URL and resolves off-origin regardless of this app's own origin.
+  if (!path.startsWith("/") || path.startsWith("//") || path.startsWith("/\\")) {
+    return defaultPath;
+  }
+
+  return path;
 }
 
 export function resolveLoginReturnTo(

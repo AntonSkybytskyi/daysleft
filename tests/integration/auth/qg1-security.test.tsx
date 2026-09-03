@@ -2,6 +2,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as schema from "@/db/schema";
 import { handleClerkWebhook } from "@/modules/auth/infra/routes/clerk-webhook";
@@ -9,7 +10,30 @@ import { UsersRepository } from "@/modules/auth/infra/users-repository";
 import { getSessionUser, type SessionDeps } from "@/modules/auth/app/session";
 import { getDashboard, DASHBOARD_PATH } from "@/modules/dashboard/app/get-dashboard";
 import { logout } from "@/modules/auth/app/logout";
-import { resolveLoginReturnTo } from "@/modules/auth/app/return-to";
+import LoginPage from "@/app/login/page";
+import SsoCallbackPage from "@/app/sso-callback/page";
+
+let mockHeaders: Record<string, string> = {};
+vi.mock("next/headers", () => ({
+  headers: () => ({ get: (name: string) => mockHeaders[name] ?? null }),
+}));
+
+let capturedLoginReturnTo: string | undefined;
+vi.mock("@/modules/auth/ui/login/LoginContainer", () => ({
+  LoginContainer: (props: { returnTo: string }) => {
+    capturedLoginReturnTo = props.returnTo;
+    return null;
+  },
+}));
+
+let capturedSsoReturnTo: string | undefined;
+vi.mock("@/modules/auth/ui/sso-callback/SsoCallbackContainer", () => ({
+  SsoCallbackContainer: (props: { returnTo: string }) => {
+    capturedSsoReturnTo = props.returnTo;
+    return null;
+  },
+}));
+
 
 const webhookSecret = "whsec_test_secret";
 
@@ -97,14 +121,37 @@ describe("QG-1 security scenarios (sad.md §10)", () => {
     expect(sessionAfterLogout).toEqual({ authenticated: false });
   });
 
-  it("(c) an off-origin return_to on GET /login is rejected in favor of the default dashboard destination", () => {
-    // Drives the exact function LoginPage calls on the untrusted query param (src/app/login/page.tsx),
-    // not just the pure helper it delegates to — this is the path an attacker actually controls.
-    const attackerReturnTo = "https://evil.example/steal-session";
+  describe("(c) an untrusted return_to is rejected before it reaches Clerk", () => {
+    beforeEach(() => {
+      mockHeaders = { host: "daysleft.example", "x-forwarded-proto": "https" };
+      capturedLoginReturnTo = undefined;
+      capturedSsoReturnTo = undefined;
+    });
 
-    const resolved = resolveLoginReturnTo(attackerReturnTo, "daysleft.example", "https", DASHBOARD_PATH);
+    const attackVectors: Array<[string, string]> = [
+      ["off-origin URL", "https://evil.example/steal-session"],
+      ["path-traversal to a protocol-relative //host path", "/..//evil.example/x"],
+      ["raw protocol-relative //host path", "//evil.example"],
+    ];
 
-    expect(resolved).toBe("/dashboard");
-    expect(resolved).not.toContain("evil.example");
+    it.each(attackVectors)(
+      "LoginPage passes a safe returnTo to LoginContainer for a %s value",
+      (_label, attackerReturnTo) => {
+        render(<LoginPage searchParams={{ return_to: attackerReturnTo }} />);
+
+        expect(capturedLoginReturnTo).toBe(DASHBOARD_PATH);
+        expect(capturedLoginReturnTo).not.toContain("evil.example");
+      },
+    );
+
+    it.each(attackVectors)(
+      "SsoCallbackPage passes a safe returnTo to SsoCallbackContainer for a %s value",
+      (_label, attackerReturnTo) => {
+        render(<SsoCallbackPage searchParams={{ return_to: attackerReturnTo }} />);
+
+        expect(capturedSsoReturnTo).toBe(DASHBOARD_PATH);
+        expect(capturedSsoReturnTo).not.toContain("evil.example");
+      },
+    );
   });
 });

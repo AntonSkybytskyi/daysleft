@@ -29,6 +29,16 @@ describe("resolveReturnTo", () => {
   it("discards a javascript: pseudo-protocol return-to value", () => {
     expect(resolveReturnTo("javascript:alert(1)", origin, defaultPath)).toBe("/dashboard");
   });
+
+  it("discards a path-traversal value that normalises to a protocol-relative //host path", () => {
+    expect(resolveReturnTo("/..//evil.example/x", origin, defaultPath)).toBe("/dashboard");
+    expect(resolveReturnTo("/a/../..//evil.example", origin, defaultPath)).toBe("/dashboard");
+    expect(resolveReturnTo("/./..//evil.example", origin, defaultPath)).toBe("/dashboard");
+  });
+
+  it("discards a raw protocol-relative //host return-to value", () => {
+    expect(resolveReturnTo("//evil.example", origin, defaultPath)).toBe("/dashboard");
+  });
 });
 
 describe("resolveLoginReturnTo (the function GET /login actually calls)", () => {
