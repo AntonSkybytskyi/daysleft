@@ -41,6 +41,12 @@ describe("DashboardScreen", () => {
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
+  it("error-logout-failed: shows a logout-specific message, not the dashboard-fetch-failure one", () => {
+    render(<DashboardScreen state="error-logout-failed" onLogout={vi.fn()} />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent(/couldn.t sign you out/i);
+  });
+
   it("renders translated strings when supplied (proves the text is not hardcoded)", () => {
     render(
       <DashboardScreen

@@ -129,7 +129,7 @@ describe("DashboardContainer", () => {
     expect(signOut).not.toHaveBeenCalled();
   });
 
-  it("shows an error instead of redirecting when the logout request fails server-side (no client-side-only logout)", async () => {
+  it("shows a logout-specific error (not the dashboard-fetch one) instead of redirecting when the logout request fails server-side", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce({ status: 200, json: async () => ({ user: { id: "u1", email: "a@b.com" }, has_trips: false }) })
@@ -141,11 +141,11 @@ describe("DashboardContainer", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Log out" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/couldn.t load your dashboard/i);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/couldn.t sign you out/i);
     expect(replace).not.toHaveBeenCalledWith("/login");
   });
 
-  it("shows an error instead of redirecting when the logout request rejects (network failure)", async () => {
+  it("shows a logout-specific error (not the dashboard-fetch one) instead of redirecting when the logout request rejects (network failure)", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce({ status: 200, json: async () => ({ user: { id: "u1", email: "a@b.com" }, has_trips: false }) })
@@ -157,7 +157,7 @@ describe("DashboardContainer", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Log out" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/couldn.t load your dashboard/i);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/couldn.t sign you out/i);
     expect(replace).not.toHaveBeenCalledWith("/login");
   });
 });

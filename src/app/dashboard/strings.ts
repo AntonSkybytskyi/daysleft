@@ -7,6 +7,7 @@ export const stringKeys = [
   "dashboard.linkedAccount",
   "dashboard.logout",
   "dashboard.errorFetchFailed",
+  "dashboard.errorLogoutFailed",
 ] as const;
 
 export function resolveStrings(acceptLanguage: string | null): Partial<DashboardScreenStrings> {
@@ -17,5 +18,6 @@ export function resolveStrings(acceptLanguage: string | null): Partial<Dashboard
     linkedAccount: t["dashboard.linkedAccount"],
     logout: t["dashboard.logout"],
     errorFetchFailed: t["dashboard.errorFetchFailed"],
+    errorLogoutFailed: t["dashboard.errorLogoutFailed"],
   };
 }

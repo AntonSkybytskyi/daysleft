@@ -137,6 +137,7 @@ updated_at: "2026-09-03"
 | default / empty | No trips recorded (AC-07); `has_trips: false` is hardcoded in this slice (spec §3 non-goal — no `trips` table yet) | `Header` (with logout), `EmptyState` | wireframe below |
 | linked-account | AC-03: this session's create-or-fetch fallback matched an existing account by verified email (`GET /api/v1/dashboard`'s `linked: true`) | `Header`, `Alert` (success), `EmptyState` | wireframe below |
 | error | The `getDashboard` fetch itself rejects (network failure) or returns a non-401 non-200 status — a genuine 401 (`auth.session_invalid`/`auth.email_required`/`auth.email_conflict`) redirects to SCR-01 instead, per the row above | `Header` (with logout), `Alert` (error) | wireframe below |
+| error-logout-failed | `POST /api/v1/auth/logout` rejects or returns non-204 — the Clerk session wasn't revoked, so this stays on SCR-03 with its own message instead of the fetch-failure one (AC-06) | `Header` (with logout), `Alert` (error) | wireframe below |
 
 ```text
 +------------------------------------------+   loading
@@ -156,6 +157,12 @@ updated_at: "2026-09-03"
 |  [ Couldn't load your dashboard. Check   ]|
 |  [ your connection and try again.        ]|
 +------------------------------------------+
+
++------------------------------------------+   error-logout-failed
+|  daysleft              [ Log out ]        |
+|  [ Couldn't sign you out. You're still   ]|
+|  [ signed in — try again.                ]|
++------------------------------------------+
 ```
 
 ### SCR-04 — Magic-link invalid
@@ -165,6 +172,7 @@ updated_at: "2026-09-03"
 | default | Link expired, already used, or superseded (AC-02) | `Alert` (error), `Button` ("Send a new link") | wireframe below |
 | loading | New-link request in flight | `Button` (loading), `Spinner` | wireframe below |
 | error-rate-limited | Same magic-link send NFR as SCR-02 (spec §6, sad.md §8) | `Alert` (error) | wireframe below |
+| error-sign-in-failed | Resend failed for a reason other than rate-limiting or the sign-up fallback (AC-02) | `Alert` (error), `Button` ("Send a new link") | wireframe below |
 | empty | N/A — this screen always shows the invalid-link message; no data-driven empty case | — |
 
 ```text
@@ -183,6 +191,13 @@ updated_at: "2026-09-03"
 +------------------------------------------+   error-rate-limited
 |  This link is no longer valid             |
 |  (!) Too many requests. Try again later.  |
++------------------------------------------+
+
++------------------------------------------+   error-sign-in-failed
+|  This link is no longer valid             |
+|  (!) Couldn't send a new link. Try again  |
+|      in a moment.                         |
+|  [ Send a new link ]                      |
 +------------------------------------------+
 ```
 

@@ -12,7 +12,7 @@ export type DashboardContainerProps = {
 export function DashboardContainer({ strings }: DashboardContainerProps = {}) {
   const router = useRouter();
   const clerk = useClerk();
-  const [status, setStatus] = useState<"loading" | "default" | "error">("loading");
+  const [status, setStatus] = useState<"loading" | "default" | "error" | "error-logout-failed">("loading");
   const [linked, setLinked] = useState(false);
 
   useEffect(() => {
@@ -59,13 +59,13 @@ export function DashboardContainer({ strings }: DashboardContainerProps = {}) {
       if (response.status !== 204) {
         // The Clerk session may still be live — never tell the Traveler they're signed out
         // when the server didn't actually revoke it.
-        setStatus("error");
+        setStatus("error-logout-failed");
         return;
       }
       await clerk.signOut();
       router.replace("/login");
     } catch {
-      setStatus("error");
+      setStatus("error-logout-failed");
     }
   };
 

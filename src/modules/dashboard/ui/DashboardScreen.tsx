@@ -3,7 +3,7 @@ import { EmptyState } from "@/modules/ui/EmptyState/EmptyState";
 import { Header } from "@/modules/ui/Header/Header";
 import { Spinner } from "@/modules/ui/Spinner/Spinner";
 
-export type DashboardScreenState = "loading" | "default" | "error";
+export type DashboardScreenState = "loading" | "default" | "error" | "error-logout-failed";
 
 export type DashboardScreenStrings = {
   emptyHeading: string;
@@ -11,6 +11,7 @@ export type DashboardScreenStrings = {
   linkedAccount: string;
   logout: string;
   errorFetchFailed: string;
+  errorLogoutFailed: string;
 };
 
 const defaultStrings: DashboardScreenStrings = {
@@ -19,6 +20,7 @@ const defaultStrings: DashboardScreenStrings = {
   linkedAccount: "Signed in to your existing account.",
   logout: "Log out",
   errorFetchFailed: "Couldn't load your dashboard. Check your connection and try again.",
+  errorLogoutFailed: "Couldn't sign you out. You're still signed in — try again.",
 };
 
 export type DashboardScreenProps = {
@@ -39,6 +41,7 @@ export function DashboardScreen({ state, onLogout, linked, strings }: DashboardS
         </div>
       )}
       {state === "error" && <Alert variant="error">{t.errorFetchFailed}</Alert>}
+      {state === "error-logout-failed" && <Alert variant="error">{t.errorLogoutFailed}</Alert>}
       {state === "default" && (
         <>
           {linked && <Alert variant="success">{t.linkedAccount}</Alert>}

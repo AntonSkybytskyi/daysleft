@@ -24,5 +24,6 @@
   "dashboard.emptyBody": "Future: add your first trip here.",
   "dashboard.linkedAccount": "Signed in to your existing account.",
   "dashboard.logout": "Log out",
-  "dashboard.errorFetchFailed": "Couldn't load your dashboard. Check your connection and try again."
+  "dashboard.errorFetchFailed": "Couldn't load your dashboard. Check your connection and try again.",
+  "dashboard.errorLogoutFailed": "Couldn't sign you out. You're still signed in — try again."
 }
