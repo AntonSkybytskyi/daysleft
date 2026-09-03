@@ -8,7 +8,7 @@ feature_size: "XS"
 
 # Spec — fetch-with-tanstack-query
 
-> **Glossary:** [CONTEXT](/CONTEXT.md) (repo-root; no feature-scoped glossary — no new domain terms)
+> **Glossary:** [CONTEXT](/CONTEXT.md) (repo-root; adds "Sign-in session" during clarify)
 > **Reference module / docs / channels used:** `src/modules/dashboard/ui/DashboardContainer.tsx`, `src/modules/dashboard/app/get-dashboard.ts`, `src/modules/auth/app/session.ts`, `docs/architecture-map.md`, `docs/features/auth-user-plus-dashboard/{sad.md,screens.md}`.
 
 ## 1. Context
@@ -21,11 +21,13 @@ The committed approach: wrap the existing dashboard fetch in a client-side query
 
 Investigation surfaced a constraint this spec must respect: the dashboard's read endpoint links the Traveler's identity to an existing account on qualifying reads, and the account-linking write itself is already safe to repeat (the server holds a durable mapping and short-circuits a repeat read). The real risk is narrower: the response's one-time "linked" indicator is only true on the first read after linking, and a caching layer's default automatic-refetch behavior (on window refocus, network reconnect, or retry) would consume that flag again and erase the one-time confirmation the Traveler already saw — not by repeating the write, but by re-fetching and re-evaluating a flag that is only meaningful once. This spec's goals and acceptance criteria are written so that one-time confirmation survives a routine revisit, not to make the underlying write more idempotent than it already is (§3 Non-goals).
 
+Two scoping notes that every duration/count guarantee below is measured against: (1) "sign-in session" (see [CONTEXT](/CONTEXT.md)) is bounded by the current page load for this cache — a browser reload is a fresh sign-in session for client-side state, even though the Traveler's underlying authentication may still be valid; the cache is never persisted across reloads (§3 Non-goals). (2) No automatic retry runs on a failed fetch — a failure goes straight to the recoverable error state (§5 AC-02) with one explicit, user-triggered retry control; nothing retries silently in the background.
+
 ## 2. Goals
 
 - Eliminate duplicate network calls for the dashboard summary when the Traveler revisits the screen within the same sign-in session (tab-switch, re-mount) — one call is reused, not re-issued.
 - Give the Traveler a consistent, explicit loading indicator and a recoverable error state on failure, replacing today's ad hoc per-case handling.
-- Establish a reusable client data-fetching convention (cache scoping, logout cleanup) that later features can adopt for their own requests without re-solving the same problems.
+- Establish a reusable client data-fetching convention other requests can copy: the query-client provider this feature adds (necessarily placed where it can wrap the app) plus a short written note on the pattern (cache scoping, logout cleanup) — not a shared hook factory or generic abstraction, which stays out of scope for this pass (§3).
 
 ## 3. Non-goals
 
@@ -33,6 +35,8 @@ Investigation surfaced a constraint this spec must respect: the dashboard's read
 - Converting the dashboard to server-side rendering — reason: it is already client-fetched today; there is no server-rendered data to preserve or hydrate.
 - Making the dashboard's read endpoint free of side effects (the account-linking write) or replacing its one-time "linked" flag with persisted state — reason: that is an auth-module change with its own blast radius, tracked separately (§8).
 - Persisting the client-side cache across browser restarts (e.g. to persisted browser storage) for offline use — reason: there is no delivered offline capability yet for this data path; persisting a cache would add cost without a delivered offline benefit.
+- Building a shared hook factory or a generic multi-module data-fetching abstraction — reason: this pass wires one query and documents the pattern in prose (§2); a shared abstraction is only worth building once a second module actually adopts it (§8).
+- Building production telemetry (RUM timing dashboards, a fetch-count metric pipeline, support-ticket auto-tagging) — reason: this pass's NFR/KPI measurements are satisfied by test assertions in CI, not new production instrumentation; wiring real telemetry is a separate, later effort.
 
 ## 4. User stories
 
@@ -76,49 +80,50 @@ Investigation surfaced a constraint this spec must respect: the dashboard's read
 
 ### AC-01 (US-01) — happy path
 
-**Given** a signed-in Traveler has already loaded their dashboard once during this sign-in session
-**When** the Traveler revisits the dashboard screen (e.g. switches tabs and back, or the screen re-mounts) without signing out
-**Then** the system shows the same summary instantly, without a visible loading flicker or a second network round-trip
+**Given** a signed-in Traveler has already loaded their dashboard once during this sign-in session (this page load; a browser reload starts a new one)
+**When** the Traveler revisits the dashboard screen (e.g. switches tabs and back, or the screen re-mounts) without signing out or reloading the page
+**Then** the system renders the already-fetched summary on first paint with no loading state shown, and issues no second network round-trip
 
 ### AC-06 (US-02) — happy path
 
-**Given** a signed-in Traveler opens the dashboard for the first time in a session
-**When** the summary has not yet finished loading
+**Given** a signed-in Traveler opens the dashboard for the first time in a page load, or has triggered the AC-02 retry control after a failure
+**When** that fetch has not yet finished
 **Then** the system shows an explicit loading indicator instead of a blank or broken-looking screen
 
 ### AC-02 (US-03) — error
 
-**Given** a signed-in Traveler opens the dashboard while their device has no network connectivity
-**When** the fetch fails for a connectivity reason
-**Then** the system shows a recoverable error message inviting the Traveler to try again, and does not send them to sign in
+**Given** a signed-in Traveler's dashboard summary fetch fails for any reason other than a confirmed invalid-session signal (no connectivity, a server-side failure, a timeout, an unreadable response)
+**When** the fetch fails
+**Then** the system shows a recoverable error message with one explicit retry control the Traveler can trigger themselves — no automatic retry — and does not send them to sign in; the fetch is never retried on its own before this state is shown
 
 ### AC-03 (US-04) — authorization
 
 **Given** a Traveler's session has expired or is otherwise invalid
-**When** the Traveler's dashboard summary is actually fetched (the initial load, or any later fetch the Traveler explicitly triggers, e.g. a retry) — not a revisit served from cache with no new fetch
-**Then** the system sends the Traveler to sign in and reveals no dashboard data, distinguishing this outcome from a connectivity error
+**When** the Traveler's dashboard summary is actually fetched (the initial load, or any later fetch the Traveler explicitly triggers, e.g. a retry) and that fetch's response carries the confirmed invalid-session signal — not a revisit served from cache with no new fetch, and not any other failure (which falls to AC-02 instead)
+**Then** the same client-side fetching logic that owns the dashboard's data request sends the Traveler to sign in and reveals no dashboard data, distinguishing this outcome from AC-02's connectivity/server-error case
 
 ### AC-04 (US-06) — domain invariant
 
 **Given** a Traveler was just linked to an existing account and has been shown the one-time confirmation
-**When** the Traveler revisits the dashboard again in the same sign-in session
-**Then** the system does not re-run the account-linking action and does not retract or re-show the confirmation as if it were a new event — the confirmation, once shown, is not silently erased by a routine revisit
+**When** the Traveler revisits the dashboard again in the same sign-in session, including a later fetch (e.g. an AC-02 retry) whose response no longer carries the linked indicator
+**Then** the confirmation remains visible for the rest of the sign-in session once shown — the system never lets a later fetch's response retract or hide it, and never re-runs the account-linking action or re-shows it as if it were a new event
 
 ### AC-05 (US-05) — cross-context
 
-**Given** a Traveler logs out of the app, and the logout is honored by the server (their session is revoked there) regardless of whether the client-side sign-out step itself completes cleanly
+**Given** a Traveler logs out of the app, and the logout request's response confirms the server revoked their session — regardless of whether the client-side sign-out step itself completes cleanly
 **When** a different Traveler subsequently signs in on the same device
-**Then** the new Traveler's dashboard never displays the previous Traveler's cached summary, even momentarily, because the prior session's cached data was cleared as soon as the server confirmed the logout — not conditioned on the client-side sign-out step succeeding
+**Then** the new Traveler's dashboard never displays the previous Traveler's cached summary, even momentarily: the cache is cleared the moment that server response arrives (not conditioned on the client-side sign-out step succeeding), and is additionally scoped to the signed-in Traveler's identity so a new Traveler's dashboard can never read an entry left behind by a prior one
 
 ## 6. Non-functional requirements
 
 | Aspect | Target | Measurement |
 |---|---|---|
-| Latency p95, dashboard first load | ≤ 500 ms | client RUM instrumentation (matches the existing dashboard first-render target) |
-| Duplicate-fetch avoidance | 0 extra network calls per revisit for the lifetime of the sign-in session (until sign-out) | client fetch-count instrumentation / test assertion pinning call count |
+| Latency p95, dashboard first load | ≤ 500 ms | test assertion in CI this pass (matches the existing dashboard first-render target; production RUM instrumentation is out of scope, §3) |
+| Duplicate-fetch avoidance | 0 extra network calls per revisit within the same page load, for as long as the Traveler stays signed in (a reload starts fresh, §1) | test assertion in CI pinning fetch call count across a repeat mount/focus |
+| Cache retention | the cached entry is never evicted or treated as stale before sign-out or page unload — no time-based expiry | test assertion in CI (staleTime/gcTime configuration + a repeat-access test) |
 | Throughput | N/A | <!-- N/A: client-side caching change, no new server load --> |
 | Availability | N/A | <!-- N/A: no new server-side component; existing dashboard endpoint availability unchanged --> |
-| One-time flag integrity | the one-shot "linked" confirmation, once shown, is not re-fetched-and-lost or re-fetched-and-re-shown for the rest of the sign-in session | integration test asserting the confirmation's visibility is unchanged across a repeat mount/focus with no new fetch |
+| One-time flag integrity | once the "linked" confirmation is shown, it remains visible for the rest of the sign-in session even if a later fetch's response no longer carries the flag (AC-04) | test assertion in CI: confirmation stays visible across a repeat mount/focus and across an AC-02 retry whose response omits the flag |
 
 ## 6.1 Security / privacy
 
@@ -127,15 +132,15 @@ Investigation surfaced a constraint this spec must respect: the dashboard's read
 - **AuthZ/AuthN impact:** none new — the cache consumes the existing session check as-is. It adds one new requirement: the cache must be scoped to the current sign-in and discarded at logout, so a session boundary is also a cache boundary.
 - **Abuse cases:**
   - **stale-authorization display:** because this pass deliberately disables automatic background revalidation (§1), cached summary data keeps rendering after a session was invalidated elsewhere until the Traveler triggers an actual fetch again — accepted as a risk bounded by "until the next real fetch", not eliminated; AC-03 guarantees that fetch (whenever it happens) always re-checks the session and never serves cached data as if it were still valid.
-  - **data leak on shared device:** cached summary (including email) surviving past logout — hidden by AC-05 (cache cleared at logout).
-  - **cross-tenant leakage:** N/A — the cache is client-side and per-device; it never mixes data across Travelers within a single browser process outside the logout boundary covered by AC-05.
+  - **data leak on shared device:** cached summary (including email) surviving past logout, or a new Traveler reading a prior one's entry — hidden by AC-05 (cache cleared on the server-confirmed logout response, and scoped by Traveler identity so a new sign-in can't read an old entry regardless of clearing timing).
+  - **cross-tenant leakage:** N/A — the cache is client-side, per-device, and per-Traveler-identity (AC-05); it never mixes data across Travelers within a single browser process.
 - **Security review:** Required — client-side caching of personal data (the Traveler's email) is a new persistence surface even though the field itself isn't new.
 
 ## 7. Metrics / KPIs
 
-- **Duplicate dashboard fetches per session** — baseline: 1 extra call per revisit (today's behavior), target: 0 for the lifetime of the sign-in session (until sign-out), measured within 30 days of rollout via client instrumentation.
-- **Dashboard loading-state coverage** — baseline: 0% of loads show a differentiated loading indicator (today's code renders no distinct loading UI state), target: 100% of dashboard loads, verified by test coverage at launch.
-- **Post-logout stale-data reports** — baseline: 0 (new metric, no prior cache existed to leak), target: remains 0, monitored ongoing via support-ticket tagging.
+- **Duplicate dashboard fetches per page load** — baseline: 1 extra call per revisit (today's behavior), target: 0 within the same page load for as long as the Traveler stays signed in, verified by test assertion at launch (production instrumentation is out of scope, §3).
+- **Dashboard loading-state coverage on fetching loads** — baseline: 0% of loads that actually fetch show a differentiated loading indicator (today's code renders no distinct loading UI state); target: 100% of loads that perform a real fetch (a cache-served revisit is exempt — AC-01 forbids showing a loading state there), verified by test coverage at launch.
+- **Post-logout stale-data reports** — baseline: 0 (new metric, no prior cache existed to leak), target: remains 0; monitored via manual triage of support tickets (automated ticket tagging is out of scope, §3).
 
 ## 8. Open questions
 
