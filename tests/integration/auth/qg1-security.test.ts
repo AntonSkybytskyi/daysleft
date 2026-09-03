@@ -9,10 +9,9 @@ import { UsersRepository } from "@/modules/auth/infra/users-repository";
 import { getSessionUser, type SessionDeps } from "@/modules/auth/app/session";
 import { getDashboard } from "@/modules/dashboard/app/get-dashboard";
 import { logout } from "@/modules/auth/app/logout";
-import { resolveReturnTo } from "@/modules/dashboard/app/return-to";
+import { resolveLoginReturnTo } from "@/modules/dashboard/app/return-to";
 
 const webhookSecret = "whsec_test_secret";
-const appOrigin = "https://daysleft.example";
 
 function verifyOk(rawBody: string) {
   return { valid: true as const, event: JSON.parse(rawBody) };
@@ -98,10 +97,12 @@ describe("QG-1 security scenarios (sad.md §10)", () => {
     expect(sessionAfterLogout).toEqual({ authenticated: false });
   });
 
-  it("(c) an off-origin return-to param is rejected in favor of the default dashboard destination", () => {
+  it("(c) an off-origin return_to on GET /login is rejected in favor of the default dashboard destination", () => {
+    // Drives the exact function LoginPage calls on the untrusted query param (src/app/login/page.tsx),
+    // not just the pure helper it delegates to — this is the path an attacker actually controls.
     const attackerReturnTo = "https://evil.example/steal-session";
 
-    const resolved = resolveReturnTo(attackerReturnTo, appOrigin);
+    const resolved = resolveLoginReturnTo(attackerReturnTo, "daysleft.example", "https");
 
     expect(resolved).toBe("/dashboard");
     expect(resolved).not.toContain("evil.example");

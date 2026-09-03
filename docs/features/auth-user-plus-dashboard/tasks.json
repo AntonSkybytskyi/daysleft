@@ -157,6 +157,199 @@
       "acs": ["AC-01", "AC-04", "AC-05", "AC-07", "AC-08"],
       "dod": "Playwright e2e covers: sign-up reaches the dashboard, an unauthenticated dashboard visit redirects to login and returns to the originally requested page after sign-in, a fresh account sees the empty-state dashboard, and the shell falls back to English for an unsupported browser locale",
       "files_hint": ["e2e/auth-dashboard.spec.ts"]
+    },
+    {
+      "id": "T18",
+      "title": "Fix the open redirect at /login and the tautological QG-1 test that hid it",
+      "layer": "wiring",
+      "deps": [],
+      "acs": ["AC-04"],
+      "dod": "an off-origin return_to on GET /login resolves to /dashboard before it ever reaches Clerk (validated in LoginPage, not only in middleware); the QG-1 test drives an untrusted return_to through the LoginPage/LoginContainer render path (not only the pure resolveReturnTo helper) and fails without the fix",
+      "files_hint": ["src/app/login/page.tsx", "src/modules/auth/ui/login/LoginContainer.tsx", "tests/integration/auth/qg1-security.test.ts"]
+    },
+    {
+      "id": "T19",
+      "title": "Add the /sso-callback route completing OAuth and magic-link sign-in",
+      "layer": "ui",
+      "deps": ["T18"],
+      "acs": ["AC-01", "AC-02b"],
+      "dod": "the provider/magic-link return trip lands on /sso-callback, which mounts Clerk's AuthenticateWithRedirectCallback and redirects to the validated return-to (or /dashboard) on success, instead of 404ing",
+      "files_hint": ["src/app/sso-callback/page.tsx"]
+    },
+    {
+      "id": "T20",
+      "title": "Add the /check-email route mounting CheckEmailScreen with resend wiring",
+      "layer": "ui",
+      "deps": [],
+      "acs": ["AC-02b"],
+      "dod": "GET /check-email?email=... renders CheckEmailScreen with a container wiring onResend to Clerk's resend call, reachable from LoginContainer's magic-link branch",
+      "files_hint": ["src/app/check-email/page.tsx", "src/modules/auth/ui/check-email/"]
+    },
+    {
+      "id": "T21",
+      "title": "Render SCR-04 magic-link-invalid on an expired/used/failed callback",
+      "layer": "ui",
+      "deps": ["T19"],
+      "acs": ["AC-02"],
+      "dod": "the /sso-callback handler renders MagicLinkInvalidScreen when Clerk's email-link verification reports expired/used/failed, and the branch is covered by a test",
+      "files_hint": ["src/app/sso-callback/page.tsx", "src/modules/auth/ui/magic-link-invalid/"]
+    },
+    {
+      "id": "T22",
+      "title": "Wire AC-01b's sign-in-failed error surfacing from the callback",
+      "layer": "wiring",
+      "deps": ["T19"],
+      "acs": ["AC-01b"],
+      "dod": "a failed or declined OAuth callback redirects to /login?error=sign_in_failed, and a test drives that callback outcome into the rendered login screen's error-sign-in-failed state",
+      "files_hint": ["src/app/sso-callback/page.tsx", "src/app/login/page.tsx"]
+    },
+    {
+      "id": "T23",
+      "title": "Surface AC-03b's email-required error to the Traveler on the interactive path",
+      "layer": "app",
+      "deps": [],
+      "acs": ["AC-03b"],
+      "dod": "getSessionUser returns a distinct result for the no-verified-email case (not a bare unauthenticated), the login route redirects to /login?error=email_required on it, and a test asserts the rendered login screen shows the email-required alert",
+      "files_hint": ["src/modules/auth/app/session.ts", "src/app/login/page.tsx"]
+    },
+    {
+      "id": "T24",
+      "title": "Add AC-03's \"signed in to existing account\" state to SCR-03",
+      "layer": "ui",
+      "deps": [],
+      "acs": ["AC-03"],
+      "dod": "screens.md documents the SCR-03 linked-account state, DashboardScreen renders it when the session resolved to a pre-existing row matched by email, and a component test asserts the message",
+      "files_hint": ["docs/features/auth-user-plus-dashboard/screens.md", "src/modules/dashboard/ui/DashboardScreen.tsx"]
+    },
+    {
+      "id": "T25",
+      "title": "Wire the remaining i18n catalog keys through translate() across all screens",
+      "layer": "ui",
+      "deps": [],
+      "acs": ["AC-08"],
+      "dod": "every user-visible string in LoginScreen, CheckEmailScreen, MagicLinkInvalidScreen, Header and DashboardScreen resolves via translate() from en.json (no hardcoded literals), and dashboard.emptyState matches the shipped copy",
+      "files_hint": [
+        "src/modules/auth/ui/login/LoginScreen.tsx",
+        "src/modules/auth/ui/check-email/CheckEmailScreen.tsx",
+        "src/modules/auth/ui/magic-link-invalid/MagicLinkInvalidScreen.tsx",
+        "src/modules/ui/Header/Header.tsx",
+        "src/modules/dashboard/ui/DashboardScreen.tsx",
+        "src/lib/i18n/en.json"
+      ]
+    },
+    {
+      "id": "T26",
+      "title": "Implement svix-id webhook dedupe",
+      "layer": "infra",
+      "deps": [],
+      "acs": ["AC-01", "AC-03"],
+      "dod": "the webhook handler persists processed svix-ids and short-circuits a redelivery with the same id to a single upsert; the existing test is corrected to assert exactly one upsert on redelivery",
+      "files_hint": ["src/modules/auth/infra/routes/clerk-webhook.ts", "src/modules/auth/infra/routes/clerk-webhook.test.ts"]
+    },
+    {
+      "id": "T27",
+      "title": "Add a distinct error code for the webhook email-conflict branch",
+      "layer": "infra",
+      "deps": ["T26"],
+      "acs": ["AC-03b"],
+      "dod": "the email-already-linked-to-a-different-account case returns a new auth.email_conflict code (not the reused auth.email_required), documented in contracts/openapi.yaml and covered by a test",
+      "files_hint": ["src/modules/auth/infra/routes/clerk-webhook.ts", "docs/features/auth-user-plus-dashboard/contracts/openapi.yaml"]
+    },
+    {
+      "id": "T28",
+      "title": "Thread the real requested path through getDashboard's 401 and DashboardContainer",
+      "layer": "app",
+      "deps": [],
+      "acs": ["AC-04", "AC-05"],
+      "dod": "getDashboard's 401 details.return_to carries the actually-requested path (not a hardcoded constant), DashboardContainer forwards it into the /login redirect, and a .catch branch handles a failed fetch instead of spinning forever",
+      "files_hint": ["src/modules/dashboard/app/get-dashboard.ts", "src/app/api/v1/dashboard/route.ts", "src/modules/dashboard/ui/DashboardContainer.tsx"]
+    },
+    {
+      "id": "T29",
+      "title": "Guard the Clerk webhook handler against non-user event types",
+      "layer": "infra",
+      "deps": ["T26", "T27"],
+      "acs": [],
+      "dod": "the handler branches on event.type, 200-and-ignores non-user.created/user.updated events, guards Array.isArray(email_addresses) and a nullable verification entry, and the route wraps the handler body in a try/catch mapping unexpected throws to a 500 in the error envelope",
+      "files_hint": ["src/modules/auth/infra/routes/clerk-webhook.ts", "src/app/webhooks/clerk/route.ts"]
+    },
+    {
+      "id": "T30",
+      "title": "Introduce AppError and the unified {error:{code,message}} envelope at every route boundary",
+      "layer": "app",
+      "deps": [],
+      "acs": [],
+      "dod": "an AppError base class exists, every API/webhook route maps thrown AppErrors to {error:{code,message}} at its boundary (per CLAUDE.md), and contracts/openapi.yaml's Error schema matches",
+      "files_hint": [
+        "src/lib/errors.ts",
+        "src/app/api/v1/dashboard/route.ts",
+        "src/app/api/v1/auth/logout/route.ts",
+        "src/app/webhooks/clerk/route.ts",
+        "docs/features/auth-user-plus-dashboard/contracts/openapi.yaml"
+      ]
+    },
+    {
+      "id": "T31",
+      "title": "Make the Postgres client a memoized singleton with env validation",
+      "layer": "infra",
+      "deps": [],
+      "acs": [],
+      "dod": "src/db/client.ts allocates one module-level pool reused across requests instead of one per call, and throws fast if DATABASE_URL is unset instead of building a broken client",
+      "files_hint": ["src/db/client.ts"]
+    },
+    {
+      "id": "T32",
+      "title": "Add a magic-link sign-up fallback for a first-time email",
+      "layer": "ui",
+      "deps": [],
+      "acs": ["AC-02b"],
+      "dod": "when signIn.create rejects with form_identifier_not_found, LoginContainer falls back to useSignUp() for the magic-link strategy instead of showing the generic sign-in-failed error",
+      "files_hint": ["src/modules/auth/ui/login/LoginContainer.tsx"]
+    },
+    {
+      "id": "T33",
+      "title": "Replace hand-rolled Svix verification with the Clerk SDK's verifyWebhook helper",
+      "layer": "infra",
+      "deps": ["T29"],
+      "acs": [],
+      "dod": "the webhook route uses @clerk/nextjs/webhooks' verifyWebhook(request, {signingSecret}) instead of the hand-rolled svix wrapper, keeping an injectable verify seam for tests; the direct svix dependency is dropped if no longer used",
+      "files_hint": ["src/modules/auth/infra/verify-webhook.ts", "src/modules/auth/infra/routes/clerk-webhook.ts", "package.json"]
+    },
+    {
+      "id": "T34",
+      "title": "Move return-to origin validation into the auth module",
+      "layer": "wiring",
+      "deps": ["T18", "T28"],
+      "acs": [],
+      "dod": "resolveReturnTo moves from src/modules/dashboard/app/ to src/modules/auth/app/, taking the default destination as a parameter; src/middleware.ts and every caller import it from its new home",
+      "files_hint": ["src/modules/dashboard/app/return-to.ts", "src/modules/auth/app/return-to.ts", "src/middleware.ts"]
+    },
+    {
+      "id": "T35",
+      "title": "Fix the users migration slot reuse and add the missing db:down runner",
+      "layer": "migration",
+      "deps": [],
+      "acs": [],
+      "dod": "the live migrations tree no longer overwrites an already-applied slot 0 in place (the reset is either reverted to an appended migration or explicitly documented as an intentional reset), and scripts/migrate-down.ts exists so pnpm db:down runs",
+      "files_hint": ["drizzle/", "scripts/migrate-down.ts", "package.json"]
+    },
+    {
+      "id": "T36",
+      "title": "Register Alert's success variant in the design system inventory",
+      "layer": "docs",
+      "deps": [],
+      "acs": [],
+      "dod": "docs/design-system.md lists Alert's success variant alongside info/error, and the screens.md \"New components\" registration column reflects the components actually registered",
+      "files_hint": ["docs/design-system.md", "docs/features/auth-user-plus-dashboard/screens.md"]
+    },
+    {
+      "id": "T37",
+      "title": "Replace the skipped e2e stubs with real coverage for the sign-in and return-to paths",
+      "layer": "tests",
+      "deps": ["T18", "T19", "T20", "T21", "T22", "T23"],
+      "acs": ["AC-01", "AC-04", "AC-05", "AC-07", "AC-08"],
+      "dod": "e2e/auth-dashboard.spec.ts scenarios have real bodies (not empty test.skip) asserting the sign-up-to-dashboard path, the unauthenticated-dashboard return-to round trip, the fresh-account empty state, and the locale fallback; any scenario still blocked by the lack of a live Clerk instance in this environment is skipped with a named reason, never silently, and CI is not claiming coverage it doesn't have",
+      "files_hint": ["e2e/auth-dashboard.spec.ts"]
     }
   ]
 }

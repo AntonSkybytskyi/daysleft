@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveReturnTo } from "./return-to";
+import { resolveReturnTo, resolveLoginReturnTo } from "./return-to";
 
 const origin = "https://daysleft.example";
 
@@ -26,5 +26,21 @@ describe("resolveReturnTo", () => {
 
   it("discards a javascript: pseudo-protocol return-to value", () => {
     expect(resolveReturnTo("javascript:alert(1)", origin)).toBe("/dashboard");
+  });
+});
+
+describe("resolveLoginReturnTo (the function GET /login actually calls)", () => {
+  it("discards an off-origin return_to before it ever reaches Clerk", () => {
+    const resolved = resolveLoginReturnTo("https://evil.example/steal-session", "daysleft.example", "https");
+    expect(resolved).toBe("/dashboard");
+    expect(resolved).not.toContain("evil.example");
+  });
+
+  it("preserves a same-origin return_to", () => {
+    expect(resolveLoginReturnTo("/trips/123", "daysleft.example", "https")).toBe("/trips/123");
+  });
+
+  it("defaults host/proto when headers are absent", () => {
+    expect(resolveLoginReturnTo(null, null, null)).toBe("/dashboard");
   });
 });

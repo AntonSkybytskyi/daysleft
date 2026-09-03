@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import { translate } from "@/lib/i18n/translate";
 import { LoginContainer } from "@/modules/auth/ui/login/LoginContainer";
-import { DASHBOARD_PATH } from "@/modules/dashboard/app/get-dashboard";
+import { resolveLoginReturnTo } from "@/modules/dashboard/app/return-to";
 import type { LoginScreenState } from "@/modules/auth/ui/login/LoginScreen";
 
 type LoginPageProps = {
@@ -22,14 +22,16 @@ function resolveState(searchParams: LoginPageProps["searchParams"]): LoginScreen
 }
 
 export default function LoginPage({ searchParams }: LoginPageProps) {
-  const acceptLanguage = headers().get("accept-language");
+  const requestHeaders = headers();
+  const acceptLanguage = requestHeaders.get("accept-language");
   const heading = translate("login.heading", acceptLanguage);
+  const returnTo = resolveLoginReturnTo(
+    searchParams.return_to ?? null,
+    requestHeaders.get("host"),
+    requestHeaders.get("x-forwarded-proto"),
+  );
 
   return (
-    <LoginContainer
-      heading={heading}
-      returnTo={searchParams.return_to ?? DASHBOARD_PATH}
-      initialState={resolveState(searchParams)}
-    />
+    <LoginContainer heading={heading} returnTo={returnTo} initialState={resolveState(searchParams)} />
   );
 }

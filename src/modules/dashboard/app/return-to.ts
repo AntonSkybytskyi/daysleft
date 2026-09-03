@@ -18,3 +18,12 @@ export function resolveReturnTo(rawReturnTo: string | null, requestOrigin: strin
 
   return `${resolved.pathname}${resolved.search}${resolved.hash}`;
 }
+
+export function resolveLoginReturnTo(
+  rawReturnTo: string | null,
+  host: string | null,
+  proto: string | null,
+): string {
+  const origin = `${proto ?? "https"}://${host ?? "localhost"}`;
+  return resolveReturnTo(rawReturnTo, origin);
+}
