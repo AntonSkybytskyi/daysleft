@@ -900,6 +900,53 @@
         "scripts/migrate-down.ts",
         "tests/integration/migrations/migrate-down.test.ts"
       ]
+    },
+    {
+      "id": "T60",
+      "title": "Actually deliver AC-02b's outcome for cross-device magic-link verification",
+      "layer": "ui",
+      "deps": [],
+      "acs": [
+        "AC-02b"
+      ],
+      "dod": "opening a magic link on a different device than the one that requested it signs the user in and shows the dashboard on that device; onVerifiedOnOtherDevice and ClientMismatch each render a state distinct from the generic 'link no longer valid' error and neither offers a 'send new link' CTA that would supersede the session just established elsewhere; screens.md documents the new state(s); test asserts a session is actually established (or, for ClientMismatch, that no destructive resend is offered), not just that a particular screen renders",
+      "files_hint": [
+        "src/modules/auth/ui/sso-callback/SsoCallbackContainer.tsx",
+        "src/modules/auth/ui/sso-callback/SsoCallbackContainer.test.tsx",
+        "src/modules/auth/ui/magic-link-invalid/MagicLinkInvalidScreen.tsx",
+        "docs/features/auth-user-plus-dashboard/screens.md"
+      ]
+    },
+    {
+      "id": "T61",
+      "title": "Stop the logout retry loop when signOut() rejects after the server already revoked the session",
+      "layer": "app",
+      "deps": [],
+      "acs": [
+        "AC-06"
+      ],
+      "dod": "when the server returns 204 but the client-side clerk.signOut() call rejects, the app does not show a retryable 'couldn't sign you out, try again' state that can never succeed (the server session is already gone, so a retried logout 401s); instead it treats the server-confirmed revoke as authoritative (e.g. redirect to /login so the middleware bounces the stale client token) or retries signOut() itself rather than re-POSTing logout; test covers the 204-resolves-but-signOut-rejects case",
+      "files_hint": [
+        "src/modules/dashboard/ui/DashboardContainer.tsx",
+        "src/modules/dashboard/ui/DashboardContainer.test.tsx"
+      ]
+    },
+    {
+      "id": "T62",
+      "title": "Re-validate or invalidate persisted linked-identity mappings instead of trusting them forever",
+      "layer": "data",
+      "deps": [
+        "T55"
+      ],
+      "acs": [
+        "AC-03"
+      ],
+      "dod": "a persisted identity→user mapping in linked_identities is not trusted indefinitely once the underlying Clerk identity's email changes; either the mapping is re-validated against Clerk before use, or it is kept in sync via the user.updated webhook (update/delete path), so a stale mapping cannot permanently attribute one person's identity to another user's account; test covers an identity whose email changed after linking",
+      "files_hint": [
+        "src/modules/auth/app/session.ts",
+        "src/modules/auth/infra/linked-identities-repository.ts",
+        "src/modules/auth/infra/routes/clerk-webhook.ts"
+      ]
     }
   ]
 }

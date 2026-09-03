@@ -68,4 +68,8 @@
 | T58 | Distinct error message for failed logout | ui | Frontend Lead | S | — | done |
 | T59 | migrate-down test exercises the real script | tests | Backend Lead | S | — | done |
 
-**Total:** 59 tasks (17 original + 20 review-2026-09-03 follow-ups + 15 review-2026-09-03-2 follow-ups + 7 review-2026-09-03-3 follow-ups); 59 done, 0 todo.
+| T60 | Actually deliver AC-02b's outcome for cross-device magic-link verify | ui | Frontend Lead | M | — | todo |
+| T61 | Stop logout retry loop when signOut() rejects after server 204 | app | Frontend Lead | S | — | todo |
+| T62 | Re-validate/invalidate persisted linked-identity mappings | data | Backend Lead | M | T55 | todo |
+
+**Total:** 62 tasks (17 original + 20 review-2026-09-03 follow-ups + 15 review-2026-09-03-2 follow-ups + 7 review-2026-09-03-3 follow-ups + 3 review-2026-09-03-4 follow-ups); 59 done, 3 todo.
