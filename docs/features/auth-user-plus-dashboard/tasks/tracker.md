@@ -24,7 +24,7 @@
 | T17 | e2e happy-path tests | tests | Frontend Lead | M | T12, T15, T9, T10 | done (3 of 4 scenarios NON-red — see e2e/auth-dashboard.spec.ts header: no live Clerk instance in this environment) |
 
 | T18 | Fix open redirect at /login + tautological QG-1 test | wiring | Backend Lead | S | — | done |
-| T19 | /sso-callback route (OAuth + magic-link completion) | ui | Frontend Lead | S | T18 | todo |
+| T19 | /sso-callback route (OAuth + magic-link completion) | ui | Frontend Lead | S | T18 | done |
 | T20 | /check-email route | ui | Frontend Lead | S | — | done |
 | T21 | Render SCR-04 on invalid callback | ui | Frontend Lead | S | T19 | todo |
 | T22 | Wire AC-01b sign-in-failed error | wiring | Frontend Lead | S | T19 | todo |

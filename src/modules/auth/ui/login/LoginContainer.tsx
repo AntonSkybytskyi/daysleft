@@ -34,7 +34,7 @@ export function LoginContainer({ heading, returnTo, initialState, strings }: Log
     try {
       await signIn.authenticateWithRedirect({
         strategy,
-        redirectUrl: "/sso-callback",
+        redirectUrl: `/sso-callback?return_to=${encodeURIComponent(returnTo)}`,
         redirectUrlComplete: returnTo,
       });
     } catch {
@@ -48,7 +48,7 @@ export function LoginContainer({ heading, returnTo, initialState, strings }: Log
     }
     setLoadingProvider("email");
     setState("loading");
-    const redirectUrl = `${window.location.origin}/sso-callback`;
+    const redirectUrl = `${window.location.origin}/sso-callback?return_to=${encodeURIComponent(returnTo)}`;
     try {
       await signIn.create({ identifier: email, strategy: "email_link", redirectUrl });
       router.push(`/check-email?email=${encodeURIComponent(email)}`);
