@@ -31,16 +31,12 @@ type ClerkEvent = { type: string; data: ClerkEventData };
 
 const handledEventTypes = new Set(["user.created", "user.updated"]);
 
+const dedupedResponse: ClerkWebhookResult = { status: 200, body: { deduped: true } };
+
 export async function handleClerkWebhook(
   request: ClerkWebhookRequest,
   deps: ClerkWebhookDeps,
 ): Promise<ClerkWebhookResult> {
-  const svixId = request.headers["svix-id"];
-  const cached = svixId ? deps.dedupeStore?.get(svixId) : undefined;
-  if (cached) {
-    return cached;
-  }
-
   const verify = deps.verify ?? verifyClerkWebhook;
   const verification = await verify(request.rawBody, request.headers, deps.webhookSecret);
 
@@ -49,6 +45,14 @@ export async function handleClerkWebhook(
       status: 401,
       body: errorBody("auth.webhook_invalid_signature", "Webhook signature verification failed."),
     };
+  }
+
+  // The dedupe cache is only consulted once the signature is verified, and it only ever holds a
+  // PII-free marker — an unauthenticated POST replaying a previously-seen svix-id must not be able
+  // to read a cached user's id/email back out without a valid signature of its own.
+  const svixId = request.headers["svix-id"];
+  if (svixId && deps.dedupeStore?.get(svixId)) {
+    return dedupedResponse;
   }
 
   const event = verification.event as ClerkEvent;
@@ -89,19 +93,30 @@ export async function handleClerkWebhook(
     },
   };
   if (svixId) {
-    deps.dedupeStore?.set(svixId, success);
+    deps.dedupeStore?.set(svixId, dedupedResponse);
   }
   return success;
 }
 
+const DEFAULT_MAX_DEDUPE_ENTRIES = 10_000;
+
 // In-memory only: dedupe within this server instance's lifetime. Redeliveries
 // after a restart or to a different instance still re-upsert, which is safe
-// (upsertById is idempotent) — this only avoids the redundant write.
-export function createInMemoryDedupeStore(): WebhookDedupeStore {
+// (upsertById is idempotent) — this only avoids the redundant write. Bounded by
+// maxEntries (oldest-first eviction, since Map preserves insertion order) so a
+// long-lived process doesn't grow this without limit.
+export function createInMemoryDedupeStore(options?: { maxEntries?: number }): WebhookDedupeStore {
+  const maxEntries = options?.maxEntries ?? DEFAULT_MAX_DEDUPE_ENTRIES;
   const seen = new Map<string, ClerkWebhookResult>();
   return {
     get: (svixId) => seen.get(svixId),
     set: (svixId, result) => {
+      if (seen.size >= maxEntries && !seen.has(svixId)) {
+        const oldestKey = seen.keys().next().value;
+        if (oldestKey !== undefined) {
+          seen.delete(oldestKey);
+        }
+      }
       seen.set(svixId, result);
     },
   };

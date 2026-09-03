@@ -142,7 +142,7 @@ describe("handleClerkWebhook", () => {
     });
   });
 
-  it("dedupes a redelivery with the same svix-id — a single upsert, the same cached result returned twice", async () => {
+  it("dedupes a redelivery with the same svix-id — a single upsert, a 200 on the second delivery too", async () => {
     const repository = fakeRepository();
     const verify = vi.fn().mockReturnValue({ valid: true, event: JSON.parse(eventPayload()) });
     const dedupeStore = createInMemoryDedupeStore();
@@ -156,7 +156,62 @@ describe("handleClerkWebhook", () => {
       { webhookSecret, repository, verify, dedupeStore },
     );
 
-    expect(first).toEqual(second);
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
     expect(repository.upsertById).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not serve the dedupe cache to a redelivery whose signature fails verification", async () => {
+    const repository = fakeRepository();
+    const verify = vi.fn().mockReturnValue({ valid: true, event: JSON.parse(eventPayload()) });
+    const dedupeStore = createInMemoryDedupeStore();
+
+    await handleClerkWebhook(
+      { headers: validHeaders, rawBody: eventPayload() },
+      { webhookSecret, repository, verify, dedupeStore },
+    );
+
+    // An attacker replaying the same svix-id with a body/signature that no longer verifies must
+    // not get the first delivery's cached (and PII-bearing) success body served back unauthenticated.
+    const forgedVerify = vi.fn().mockReturnValue({ valid: false });
+    const replayed = await handleClerkWebhook(
+      { headers: validHeaders, rawBody: eventPayload() },
+      { webhookSecret, repository, verify: forgedVerify, dedupeStore },
+    );
+
+    expect(replayed.status).toBe(401);
+    expect(replayed.body).toEqual({
+      code: "auth.webhook_invalid_signature",
+      message: "Webhook signature verification failed.",
+    });
+  });
+
+  it("caches only a status marker, never the user's id/email, so a replayed svix-id can't be used to read PII", async () => {
+    const repository = fakeRepository();
+    const verify = vi.fn().mockReturnValue({ valid: true, event: JSON.parse(eventPayload()) });
+    const dedupeStore = createInMemoryDedupeStore();
+
+    await handleClerkWebhook(
+      { headers: validHeaders, rawBody: eventPayload() },
+      { webhookSecret, repository, verify, dedupeStore },
+    );
+    const second = await handleClerkWebhook(
+      { headers: validHeaders, rawBody: eventPayload() },
+      { webhookSecret, repository, verify, dedupeStore },
+    );
+
+    expect(JSON.stringify(second.body)).not.toContain("traveler@example.test");
+    expect(JSON.stringify(second.body)).not.toContain("user_1");
+  });
+
+  it("bounds the in-memory dedupe store instead of retaining every svix-id for the process lifetime", async () => {
+    const dedupeStore = createInMemoryDedupeStore({ maxEntries: 2 });
+    dedupeStore.set("a", { status: 200, body: { deduped: true } });
+    dedupeStore.set("b", { status: 200, body: { deduped: true } });
+    dedupeStore.set("c", { status: 200, body: { deduped: true } });
+
+    expect(dedupeStore.get("a")).toBeUndefined();
+    expect(dedupeStore.get("b")).toBeDefined();
+    expect(dedupeStore.get("c")).toBeDefined();
   });
 });
