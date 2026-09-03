@@ -9,6 +9,9 @@ export function resolveLoginState(searchParams: LoginPageSearchParams): LoginScr
   if (searchParams.error === "email_required") {
     return "error-email-required";
   }
+  if (searchParams.error === "email_conflict") {
+    return "error-email-conflict";
+  }
   if (searchParams.return_to) {
     return "redirected-sign-in-required";
   }

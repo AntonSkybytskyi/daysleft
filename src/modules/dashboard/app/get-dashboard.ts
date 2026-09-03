@@ -25,6 +25,17 @@ export async function getDashboard(
       };
     }
 
+    if (session.reason === "email_conflict") {
+      return {
+        status: 401,
+        body: errorBody(
+          "auth.email_conflict",
+          "That email is already linked to a different account. Sign in with the original method.",
+          { return_to: requestedPath },
+        ),
+      };
+    }
+
     return {
       status: 401,
       body: errorBody("auth.session_invalid", "Sign in to view your dashboard.", {

@@ -63,6 +63,29 @@ describe("getDashboard", () => {
     });
   });
 
+  it("returns 401 auth.email_conflict (not session_invalid) when the identity's email is owned by a different account", async () => {
+    const sessionDeps: SessionDeps = {
+      getAuthUserId: vi.fn().mockResolvedValue("user_new_identity"),
+      repository: {
+        findById: vi.fn().mockResolvedValue(null),
+        findByEmail: vi.fn().mockResolvedValue(null),
+        upsertById: vi.fn().mockResolvedValue({ kind: "email_conflict" }),
+      } as never,
+      fetchClerkUser: vi.fn().mockResolvedValue({ id: "user_new_identity", verifiedEmail: "traveler@example.test" }),
+    };
+
+    const result = await getDashboard(sessionDeps);
+
+    expect(result).toEqual({
+      status: 401,
+      body: {
+        code: "auth.email_conflict",
+        message: "That email is already linked to a different account. Sign in with the original method.",
+        details: { return_to: "/dashboard" },
+      },
+    });
+  });
+
   it("returns 401 auth.email_required when Clerk has no verified email for this session", async () => {
     const sessionDeps: SessionDeps = {
       getAuthUserId: vi.fn().mockResolvedValue("user_1"),

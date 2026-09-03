@@ -98,6 +98,23 @@ describe("getSessionUser", () => {
     expect(fetchClerkUser).toHaveBeenCalledTimes(1);
   });
 
+  it("reports email_conflict (not a generic session-invalid) when upsertById finds the identity's email owned by a different account", async () => {
+    const repository = fakeRepository({
+      findById: vi.fn().mockResolvedValue(null),
+      findByEmail: vi.fn().mockResolvedValue(null),
+      upsertById: vi.fn().mockResolvedValue({ kind: "email_conflict" }),
+    });
+    const deps: SessionDeps = {
+      getAuthUserId: vi.fn().mockResolvedValue("user_new_identity"),
+      repository,
+      fetchClerkUser: vi.fn().mockResolvedValue({ id: "user_new_identity", verifiedEmail: "traveler@example.test" }),
+    };
+
+    const result = await getSessionUser(deps);
+
+    expect(result).toEqual({ authenticated: false, reason: "email_conflict" });
+  });
+
   it("resolves to unauthenticated with no data leaked when Clerk has no verified email for this user", async () => {
     const repository = fakeRepository();
     const deps: SessionDeps = {

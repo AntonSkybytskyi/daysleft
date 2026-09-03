@@ -7,6 +7,7 @@
   "login.sendMagicLink": "Send magic link",
   "login.errorSignInFailed": "Sign-in didn't complete. Try again with any method below.",
   "login.errorEmailRequired": "Your provider didn't share a verified email. Make one visible or verified, then try again.",
+  "login.errorEmailConflict": "That email is already linked to a different account. Sign in with the original method.",
   "login.redirectedSignInRequired": "Sign in to continue.",
   "checkEmail.heading": "Check your email",
   "checkEmail.body": "We sent a sign-in link to {email}. Didn't get it?",

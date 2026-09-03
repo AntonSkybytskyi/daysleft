@@ -27,7 +27,9 @@ export function DashboardContainer({ strings }: DashboardContainerProps = {}) {
           const loginUrl =
             error?.code === "auth.email_required"
               ? "/login?error=email_required"
-              : `/login?return_to=${encodeURIComponent(error?.details?.return_to ?? path)}`;
+              : error?.code === "auth.email_conflict"
+                ? "/login?error=email_conflict"
+                : `/login?return_to=${encodeURIComponent(error?.details?.return_to ?? path)}`;
           router.replace(loginUrl);
           return;
         }

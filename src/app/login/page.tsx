@@ -14,6 +14,7 @@ const stringKeys = [
   "login.sendMagicLink",
   "login.errorSignInFailed",
   "login.errorEmailRequired",
+  "login.errorEmailConflict",
   "login.redirectedSignInRequired",
 ] as const;
 
@@ -27,6 +28,7 @@ function resolveStrings(acceptLanguage: string | null): Partial<LoginScreenStrin
     sendMagicLink: t["login.sendMagicLink"],
     errorSignInFailed: t["login.errorSignInFailed"],
     errorEmailRequired: t["login.errorEmailRequired"],
+    errorEmailConflict: t["login.errorEmailConflict"],
     redirectedSignInRequired: t["login.redirectedSignInRequired"],
   };
 }

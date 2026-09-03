@@ -8,6 +8,7 @@ export type LoginScreenState =
   | "loading"
   | "error-sign-in-failed"
   | "error-email-required"
+  | "error-email-conflict"
   | "redirected-sign-in-required";
 
 export type LoginScreenStrings = {
@@ -18,6 +19,7 @@ export type LoginScreenStrings = {
   sendMagicLink: string;
   errorSignInFailed: string;
   errorEmailRequired: string;
+  errorEmailConflict: string;
   redirectedSignInRequired: string;
 };
 
@@ -29,6 +31,7 @@ const defaultStrings: LoginScreenStrings = {
   sendMagicLink: "Send magic link",
   errorSignInFailed: "Sign-in didn't complete. Try again with any method below.",
   errorEmailRequired: "Your provider didn't share a verified email. Make one visible or verified, then try again.",
+  errorEmailConflict: "That email is already linked to a different account. Sign in with the original method.",
   redirectedSignInRequired: "Sign in to continue.",
 };
 
@@ -64,6 +67,7 @@ export function LoginScreen({
 
       {state === "error-sign-in-failed" && <Alert variant="error">{t.errorSignInFailed}</Alert>}
       {state === "error-email-required" && <Alert variant="error">{t.errorEmailRequired}</Alert>}
+      {state === "error-email-conflict" && <Alert variant="error">{t.errorEmailConflict}</Alert>}
       {state === "redirected-sign-in-required" && <Alert variant="info">{t.redirectedSignInRequired}</Alert>}
 
       <OAuthProviderButton provider="google" label={t.continueWithGoogle} onClick={onGoogleClick} loading={state === "loading" && loadingProvider === "google"} />

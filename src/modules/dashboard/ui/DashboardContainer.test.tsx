@@ -64,6 +64,17 @@ describe("DashboardContainer", () => {
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/login?error=email_required"));
   });
 
+  it("redirects to /login?error=email_conflict when the dashboard fetch returns 401 auth.email_conflict", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ status: 401, json: async () => ({ error: { code: "auth.email_conflict" } }) }),
+    );
+
+    render(<DashboardContainer />);
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/login?error=email_conflict"));
+  });
+
   it("calls the logout endpoint and redirects to /login when Log out is clicked", async () => {
     const fetchMock = vi
       .fn()
