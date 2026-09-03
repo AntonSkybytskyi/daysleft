@@ -126,6 +126,39 @@ describe("SsoCallbackContainer — email-link flow", () => {
     expect(replace).not.toHaveBeenCalled();
   });
 
+  it("renders verified-elsewhere with the strings passed down from the page (i18n), not hardcoded English", async () => {
+    const handleEmailLinkVerification = vi
+      .fn()
+      .mockRejectedValue(emailLinkError(EmailLinkErrorCodeStatus.ClientMismatch));
+    render(
+      <SsoCallbackContainer
+        returnTo="/dashboard"
+        flow="email_link"
+        deps={{ handleEmailLinkVerification } as never}
+        strings={{ verifiedElsewhereHeading: "Ви увійшли" }}
+      />,
+    );
+
+    expect(await screen.findByText("Ви увійшли")).toBeInTheDocument();
+  });
+
+  it("renders verified-elsewhere-unconfirmed with the strings passed down from the page (i18n), not hardcoded English", async () => {
+    const handleEmailLinkVerification = vi
+      .fn()
+      .mockRejectedValue(emailLinkError(EmailLinkErrorCodeStatus.ClientMismatch));
+    render(
+      <SsoCallbackContainer
+        returnTo="/dashboard"
+        flow="email_link"
+        isSignUp
+        deps={{ handleEmailLinkVerification } as never}
+        strings={{ backToLogin: "Назад до входу" }}
+      />,
+    );
+
+    expect(await screen.findByRole("button", { name: "Назад до входу" })).toBeInTheDocument();
+  });
+
   it("gives the sign-up branch's client_mismatch a truthful unconfirmed state and a non-destructive way back, not a false 'signed in' claim or a dead end", async () => {
     const handleEmailLinkVerification = vi
       .fn()

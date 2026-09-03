@@ -81,7 +81,7 @@
 | T69 | Guard /check-email poll against cancellation/unmount races | ui | Frontend Lead | M | T60 | done (remount-resend guard not attempted — see commit body: no verifiable way to detect "already prepared" without clerk-js's un-bundled internal source; open question recorded) |
 | T70 | Fix CheckEmailContainer tests to match real Clerk SignInStatus contract + test single-send | tests | Frontend Lead | S | T60 | done |
 | T71 | Retry/force-clear client session when signOut() rejects after server 204 | app | Frontend Lead | S | T61 | done |
-| T72 | Wire verified-elsewhere screen strings through i18n catalog | ui | Frontend Lead | S | T60 | todo |
+| T72 | Wire verified-elsewhere screen strings through i18n catalog | ui | Frontend Lead | S | T60 | done |
 | T73 | Clean up dead resend CTA wiring, redundant Clerk import, optional invalidation dependency | docs | Backend Lead | S | T60, T62, T67 | todo |
 
 **Total:** 73 tasks (17 original + 20 review-2026-09-03 follow-ups + 15 review-2026-09-03-2 follow-ups + 7 review-2026-09-03-3 follow-ups + 5 review-2026-09-03-4 follow-ups + 9 review-2026-09-03-5 follow-ups); 64 done, 9 todo.

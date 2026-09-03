@@ -7,6 +7,11 @@ export const stringKeys = [
   "magicLinkInvalid.sendNewLink",
   "magicLinkInvalid.errorRateLimited",
   "magicLinkInvalid.errorSignInFailed",
+  "magicLinkInvalid.verifiedElsewhereHeading",
+  "magicLinkInvalid.verifiedElsewhereBody",
+  "magicLinkInvalid.unconfirmedElsewhereHeading",
+  "magicLinkInvalid.unconfirmedElsewhereBody",
+  "magicLinkInvalid.backToLogin",
 ] as const;
 
 export function resolveStrings(acceptLanguage: string | null): Partial<MagicLinkInvalidScreenStrings> {
@@ -17,5 +22,10 @@ export function resolveStrings(acceptLanguage: string | null): Partial<MagicLink
     sendNewLink: t["magicLinkInvalid.sendNewLink"],
     errorRateLimited: t["magicLinkInvalid.errorRateLimited"],
     errorSignInFailed: t["magicLinkInvalid.errorSignInFailed"],
+    verifiedElsewhereHeading: t["magicLinkInvalid.verifiedElsewhereHeading"],
+    verifiedElsewhereBody: t["magicLinkInvalid.verifiedElsewhereBody"],
+    unconfirmedElsewhereHeading: t["magicLinkInvalid.unconfirmedElsewhereHeading"],
+    unconfirmedElsewhereBody: t["magicLinkInvalid.unconfirmedElsewhereBody"],
+    backToLogin: t["magicLinkInvalid.backToLogin"],
   };
 }
