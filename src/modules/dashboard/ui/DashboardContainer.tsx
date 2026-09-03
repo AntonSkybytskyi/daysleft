@@ -10,25 +10,36 @@ export type DashboardContainerProps = {
 
 export function DashboardContainer({ strings }: DashboardContainerProps = {}) {
   const router = useRouter();
-  const [loaded, setLoaded] = useState(false);
+  const [status, setStatus] = useState<"loading" | "default" | "error">("loading");
   const [linked, setLinked] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    const path = `${window.location.pathname}${window.location.search}`;
 
-    fetch("/api/v1/dashboard").then(async (response) => {
-      if (cancelled) {
-        return;
-      }
-      if (response.status === 401) {
+    fetch(`/api/v1/dashboard?path=${encodeURIComponent(path)}`)
+      .then(async (response) => {
+        if (cancelled) {
+          return;
+        }
+        if (response.status === 401) {
+          const body = await response.json();
+          const loginUrl =
+            body.code === "auth.email_required"
+              ? "/login?error=email_required"
+              : `/login?return_to=${encodeURIComponent(body.details?.return_to ?? path)}`;
+          router.replace(loginUrl);
+          return;
+        }
         const body = await response.json();
-        router.replace(body.code === "auth.email_required" ? "/login?error=email_required" : "/login");
-        return;
-      }
-      const body = await response.json();
-      setLinked(Boolean(body.linked));
-      setLoaded(true);
-    });
+        setLinked(Boolean(body.linked));
+        setStatus("default");
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setStatus("error");
+        }
+      });
 
     return () => {
       cancelled = true;
@@ -43,12 +54,5 @@ export function DashboardContainer({ strings }: DashboardContainerProps = {}) {
     router.replace("/login");
   };
 
-  return (
-    <DashboardScreen
-      state={loaded ? "default" : "loading"}
-      onLogout={handleLogout}
-      linked={linked}
-      strings={strings}
-    />
-  );
+  return <DashboardScreen state={status} onLogout={handleLogout} linked={linked} strings={strings} />;
 }

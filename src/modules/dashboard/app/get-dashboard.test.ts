@@ -44,6 +44,25 @@ describe("getDashboard", () => {
     });
   });
 
+  it("returns 401 auth.session_invalid with the actually-requested path when one is given", async () => {
+    const sessionDeps: SessionDeps = {
+      getAuthUserId: vi.fn().mockResolvedValue(null),
+      repository: { findById: vi.fn() } as never,
+      fetchClerkUser: vi.fn(),
+    };
+
+    const result = await getDashboard(sessionDeps, "/dashboard/trips/123");
+
+    expect(result).toEqual({
+      status: 401,
+      body: {
+        code: "auth.session_invalid",
+        message: "Sign in to view your dashboard.",
+        details: { return_to: "/dashboard/trips/123" },
+      },
+    });
+  });
+
   it("returns 401 auth.email_required when Clerk has no verified email for this session", async () => {
     const sessionDeps: SessionDeps = {
       getAuthUserId: vi.fn().mockResolvedValue("user_1"),

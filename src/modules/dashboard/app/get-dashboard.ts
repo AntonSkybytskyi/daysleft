@@ -7,7 +7,10 @@ export type DashboardResult =
   | { status: 200; body: { user: { id: string; email: string }; has_trips: false; linked: boolean } }
   | { status: 401; body: ReturnType<typeof errorBody> };
 
-export async function getDashboard(sessionDeps: SessionDeps): Promise<DashboardResult> {
+export async function getDashboard(
+  sessionDeps: SessionDeps,
+  requestedPath: string = DASHBOARD_PATH,
+): Promise<DashboardResult> {
   const session = await getSessionUser(sessionDeps);
 
   if (!session.authenticated) {
@@ -17,7 +20,7 @@ export async function getDashboard(sessionDeps: SessionDeps): Promise<DashboardR
         body: errorBody(
           "auth.email_required",
           "Add or verify an email address with your sign-in provider, then try again.",
-          { return_to: DASHBOARD_PATH },
+          { return_to: requestedPath },
         ),
       };
     }
@@ -25,7 +28,7 @@ export async function getDashboard(sessionDeps: SessionDeps): Promise<DashboardR
     return {
       status: 401,
       body: errorBody("auth.session_invalid", "Sign in to view your dashboard.", {
-        return_to: DASHBOARD_PATH,
+        return_to: requestedPath,
       }),
     };
   }

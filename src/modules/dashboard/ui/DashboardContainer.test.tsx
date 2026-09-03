@@ -27,15 +27,28 @@ describe("DashboardContainer", () => {
     await waitFor(() => expect(screen.getByText(/nothing tracked yet/i)).toBeInTheDocument());
   });
 
-  it("redirects to /login when the dashboard fetch returns 401", async () => {
+  it("redirects to /login, forwarding the server's return_to, when the dashboard fetch returns 401", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({ status: 401, json: async () => ({ code: "auth.session_invalid" }) }),
+      vi.fn().mockResolvedValue({
+        status: 401,
+        json: async () => ({ code: "auth.session_invalid", details: { return_to: "/dashboard/trips/123" } }),
+      }),
     );
 
     render(<DashboardContainer />);
 
-    await waitFor(() => expect(replace).toHaveBeenCalledWith("/login"));
+    await waitFor(() =>
+      expect(replace).toHaveBeenCalledWith(`/login?return_to=${encodeURIComponent("/dashboard/trips/123")}`),
+    );
+  });
+
+  it("shows an error instead of spinning forever when the dashboard fetch rejects", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network down")));
+
+    render(<DashboardContainer />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/couldn.t load your dashboard/i);
   });
 
   it("redirects to /login?error=email_required when the dashboard fetch returns 401 auth.email_required", async () => {

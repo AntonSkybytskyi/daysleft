@@ -34,6 +34,13 @@ describe("DashboardScreen", () => {
     expect(screen.queryByText(/signed in to your existing account/i)).not.toBeInTheDocument();
   });
 
+  it("error: shows a fetch-failure message instead of spinning forever", () => {
+    render(<DashboardScreen state="error" onLogout={vi.fn()} />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent(/couldn.t load your dashboard/i);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
   it("renders translated strings when supplied (proves the text is not hardcoded)", () => {
     render(
       <DashboardScreen
