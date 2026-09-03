@@ -43,4 +43,23 @@ describe("getDashboard", () => {
       },
     });
   });
+
+  it("returns 401 auth.email_required when Clerk has no verified email for this session", async () => {
+    const sessionDeps: SessionDeps = {
+      getAuthUserId: vi.fn().mockResolvedValue("user_1"),
+      repository: { findById: vi.fn().mockResolvedValue(null) } as never,
+      fetchClerkUser: vi.fn().mockResolvedValue({ id: "user_1", verifiedEmail: null }),
+    };
+
+    const result = await getDashboard(sessionDeps);
+
+    expect(result).toEqual({
+      status: 401,
+      body: {
+        code: "auth.email_required",
+        message: "Add or verify an email address with your sign-in provider, then try again.",
+        details: { return_to: "/dashboard" },
+      },
+    });
+  });
 });

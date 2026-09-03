@@ -11,6 +11,17 @@ export async function getDashboard(sessionDeps: SessionDeps): Promise<DashboardR
   const session = await getSessionUser(sessionDeps);
 
   if (!session.authenticated) {
+    if (session.reason === "email_required") {
+      return {
+        status: 401,
+        body: errorBody(
+          "auth.email_required",
+          "Add or verify an email address with your sign-in provider, then try again.",
+          { return_to: DASHBOARD_PATH },
+        ),
+      };
+    }
+
     return {
       status: 401,
       body: errorBody("auth.session_invalid", "Sign in to view your dashboard.", {

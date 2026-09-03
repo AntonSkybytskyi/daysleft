@@ -28,11 +28,25 @@ describe("DashboardContainer", () => {
   });
 
   it("redirects to /login when the dashboard fetch returns 401", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 401, json: async () => ({}) }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ status: 401, json: async () => ({ code: "auth.session_invalid" }) }),
+    );
 
     render(<DashboardContainer />);
 
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/login"));
+  });
+
+  it("redirects to /login?error=email_required when the dashboard fetch returns 401 auth.email_required", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ status: 401, json: async () => ({ code: "auth.email_required" }) }),
+    );
+
+    render(<DashboardContainer />);
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/login?error=email_required"));
   });
 
   it("calls the logout endpoint and redirects to /login when Log out is clicked", async () => {

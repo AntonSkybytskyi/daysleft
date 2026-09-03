@@ -66,7 +66,7 @@ describe("getSessionUser", () => {
 
     const result = await getSessionUser(deps);
 
-    expect(result).toEqual({ authenticated: false });
+    expect(result).toEqual({ authenticated: false, reason: "email_required" });
     expect(repository.upsertById).not.toHaveBeenCalled();
   });
 });

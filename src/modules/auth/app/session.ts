@@ -1,7 +1,9 @@
 import { resolveAccountLinking } from "./account-linking";
 import type { User, UsersRepository } from "../infra/users-repository";
 
-export type SessionResult = { authenticated: true; user: User } | { authenticated: false };
+export type SessionResult =
+  | { authenticated: true; user: User }
+  | { authenticated: false; reason?: "email_required" };
 
 export type SessionDeps = {
   getAuthUserId: () => Promise<string | null>;
@@ -30,7 +32,7 @@ export async function getSessionUser(deps: SessionDeps): Promise<SessionResult> 
   );
 
   if (decision.kind === "rejected") {
-    return { authenticated: false };
+    return { authenticated: false, reason: decision.reason };
   }
 
   const result = await deps.repository.upsertById({ id: decision.id, email: decision.email });

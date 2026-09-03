@@ -11,12 +11,13 @@ export function DashboardContainer() {
   useEffect(() => {
     let cancelled = false;
 
-    fetch("/api/v1/dashboard").then((response) => {
+    fetch("/api/v1/dashboard").then(async (response) => {
       if (cancelled) {
         return;
       }
       if (response.status === 401) {
-        router.replace("/login");
+        const body = await response.json();
+        router.replace(body.code === "auth.email_required" ? "/login?error=email_required" : "/login");
         return;
       }
       setLoaded(true);
