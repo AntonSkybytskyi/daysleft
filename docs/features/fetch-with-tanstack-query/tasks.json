@@ -1,0 +1,77 @@
+{
+  "slug": "fetch-with-tanstack-query",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Add TanStack Query dependency and root provider",
+      "layer": "wiring",
+      "deps": [],
+      "acs": [],
+      "dod": "package.json lists @tanstack/react-query; the app renders under a QueryClientProvider nested inside ClerkProvider in the root layout with no runtime error.",
+      "files_hint": ["package.json", "src/app/layout.tsx"]
+    },
+    {
+      "id": "T2",
+      "title": "Define the dashboard query with conservative, identity-scoped config",
+      "layer": "app",
+      "deps": [],
+      "acs": [],
+      "dod": "a unit test asserts the query's options set staleTime/gcTime to Infinity, refetchOnWindowFocus/refetchOnReconnect to false, and retry to false; a unit test asserts the query key includes the signed-in Traveler's identity.",
+      "files_hint": ["src/modules/dashboard/app/dashboard-query.ts"]
+    },
+    {
+      "id": "T3",
+      "title": "Migrate DashboardContainer to the query hook",
+      "layer": "ui",
+      "deps": ["T1", "T2"],
+      "acs": ["AC-01", "AC-03", "AC-06"],
+      "dod": "component tests confirm: a cache-hit revisit renders with no new fetch and no loading state (AC-01); a first load shows the loading indicator until the fetch resolves (AC-06); a confirmed invalid-session response redirects to sign-in and shows no dashboard data (AC-03), distinct from a connectivity/server failure.",
+      "files_hint": ["src/modules/dashboard/ui/DashboardContainer.tsx"]
+    },
+    {
+      "id": "T4",
+      "title": "Add the retry control to the error state",
+      "layer": "ui",
+      "deps": ["T3"],
+      "acs": ["AC-02"],
+      "dod": "component test confirms a non-session-invalid failure shows the recoverable error with one Button retry control, no automatic retry fires, and triggering it re-issues exactly one fetch.",
+      "files_hint": ["src/modules/dashboard/ui/DashboardContainer.tsx", "src/modules/dashboard/ui/DashboardScreen.tsx"]
+    },
+    {
+      "id": "T5",
+      "title": "Preserve the linked confirmation across a later fetch",
+      "layer": "app",
+      "deps": ["T2", "T3"],
+      "acs": ["AC-04"],
+      "dod": "component test confirms that once the linked confirmation is shown, a later fetch (e.g. the AC-02 retry) whose response reads linked=false does not hide it, re-trigger it, or re-run the account-linking action.",
+      "files_hint": ["src/modules/dashboard/app/dashboard-query.ts", "src/modules/dashboard/ui/DashboardContainer.tsx"]
+    },
+    {
+      "id": "T6",
+      "title": "Clear the identity-scoped cache on server-confirmed logout",
+      "layer": "app",
+      "deps": ["T2", "T3"],
+      "acs": ["AC-05"],
+      "dod": "integration test confirms the dashboard query cache entry for the logged-out Traveler's identity is removed as soon as the logout response confirms the server revoked the session, independent of whether the client-side sign-out step succeeds or fails, and a subsequently-signed-in different Traveler's dashboard fetch never reads the prior entry.",
+      "files_hint": ["src/modules/dashboard/app/dashboard-query.ts", "src/modules/dashboard/ui/DashboardContainer.tsx"]
+    },
+    {
+      "id": "T7",
+      "title": "Test DashboardContainer/DashboardScreen against AC-01/02/03/04/06",
+      "layer": "tests",
+      "deps": ["T3", "T4", "T5"],
+      "acs": ["AC-01", "AC-02", "AC-03", "AC-04", "AC-06"],
+      "dod": "DashboardContainer.test.tsx and DashboardScreen.test.tsx cover: dedup call-count pinning (AC-01), retry-control behavior with no auto-retry (AC-02), the invalid-session-vs-connectivity-error split (AC-03), confirmation persistence across a retry (AC-04), and the loading indicator on first load and on retry (AC-06); all pass.",
+      "files_hint": ["src/modules/dashboard/ui/DashboardContainer.test.tsx", "src/modules/dashboard/ui/DashboardScreen.test.tsx"]
+    },
+    {
+      "id": "T8",
+      "title": "Test dashboard-query cache config, identity scoping, and logout clear",
+      "layer": "tests",
+      "deps": ["T2", "T6"],
+      "acs": ["AC-05"],
+      "dod": "dashboard-query.test.ts covers the conservative option set, the identity-scoped key, the retention rule (no eviction before sign-out/page unload), and the logout-clear behavior (AC-05); all pass.",
+      "files_hint": ["src/modules/dashboard/app/dashboard-query.test.ts"]
+    }
+  ]
+}
