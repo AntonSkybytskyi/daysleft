@@ -29,6 +29,7 @@ updated_at: "2026-09-03"
 | error-sign-in-failed | OAuth consent declined or provider unavailable (AC-01b) | `Alert` (error), `OAuthProviderButton` ×2, `EmailInput` | wireframe below |
 | error-email-required | OAuth provider returned no verified email (AC-03b, contract `auth.email_required`) | `Alert` (error), `OAuthProviderButton` ×2 | wireframe below |
 | redirected-sign-in-required | Unauthenticated visit to a protected route; return-to preserved, no data revealed (AC-05, contract `getDashboard` 401 `auth.session_invalid`) | `Alert` (info), `OAuthProviderButton` ×2, `EmailInput` | wireframe below |
+| error-email-conflict | Dashboard 401'd with `auth.email_conflict` — the session's verified email is already linked to a different account (AC-03b, contract `auth.email_conflict`) | `Alert` (error), `OAuthProviderButton` ×2, `EmailInput` | wireframe below |
 
 ```text
 +------------------------------------------+   default
@@ -73,6 +74,16 @@ updated_at: "2026-09-03"
 |  [ Continue with GitHub  ]                |
 |  Email: [______________________]          |
 +------------------------------------------+
+
++------------------------------------------+   error-email-conflict
+|  daysleft                                 |
+|  (!) That email is already linked to a    |
+|      different account. Sign in with      |
+|      the original method.                 |
+|  [ Continue with Google  ]                |
+|  [ Continue with GitHub  ]                |
+|  Email: [______________________]          |
++------------------------------------------+
 ```
 
 ### SCR-02 — Check your email
@@ -83,6 +94,7 @@ updated_at: "2026-09-03"
 | loading | Resend requested, in flight | `LinkButton` (loading), `Spinner` | wireframe below |
 | resent-confirmation | Resend succeeded | `Alert` (success) | wireframe below |
 | error-rate-limited | Magic-link send rate exceeded (spec §6 NFR ≤5/email/hour, sad.md §8 risk) | `Alert` (error) | wireframe below |
+| error-sign-in-failed | Resend failed for a reason other than rate-limiting (AC-02b) | `Alert` (error), `LinkButton` ("Resend") | wireframe below |
 | empty | N/A — this screen always shows the confirmation content; no data-driven empty case | — |
 
 ```text
@@ -107,6 +119,13 @@ updated_at: "2026-09-03"
 +------------------------------------------+   error-rate-limited
 |  Check your email                         |
 |  (!) Too many requests. Try again later.  |
++------------------------------------------+
+
++------------------------------------------+   error-sign-in-failed
+|  Check your email                         |
+|  (!) Couldn't resend the link. Try again  |
+|      in a moment.                         |
+|  Didn't get it? [ Resend ]                |
 +------------------------------------------+
 ```
 

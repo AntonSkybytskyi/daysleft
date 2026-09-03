@@ -122,13 +122,16 @@ paths:
               example:
                 user: { id: "user_2sZ1example", email: "traveler@example.test" }
                 has_trips: false
+                linked: false
         "401":
           description: |
             No session, or an expired/invalid one — no account or dashboard data is revealed
             (sad.md §6 flows 6, 7). `details.return_to` carries the originally requested path so
             the client can round-trip it through Clerk's hosted login and land back here (AC-04).
             `auth.session_invalid` covers no-session/expired/revoked; `auth.email_required`
-            covers a valid Clerk session whose account has no verified email yet (AC-03b).
+            covers a valid Clerk session whose account has no verified email yet; `auth.email_conflict`
+            covers a valid Clerk session whose verified email is already linked to a different
+            account (AC-03b).
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -145,6 +148,13 @@ paths:
                     error:
                       code: "auth.email_required"
                       message: "Add or verify an email address with your sign-in provider, then try again."
+                      details:
+                        return_to: "/dashboard"
+                emailConflict:
+                  value:
+                    error:
+                      code: "auth.email_conflict"
+                      message: "That email is already linked to a different account. Sign in with the original method."
                       details:
                         return_to: "/dashboard"
 
@@ -278,7 +288,9 @@ components:
       properties:
         type:
           type: string
-          enum: [user.created, user.updated]
+          description: >-
+            Any Clerk event type — the webhook accepts every event Clerk sends and only *acts* on
+            user.created/user.updated (others come back as IgnoredEvent, see the 200 response).
         data:
           type: object
           required: [id, email_addresses]
