@@ -88,6 +88,6 @@
 | T75 | Close AC-02b's sign-up sub-branch gap in the artifact trio and give the sign-in dead end a CTA | docs | Backend Lead | S | T65, T67 | todo |
 | T76 | Give T71's logout retry real backoff and a genuine force-clear on exhaustion | app | Frontend Lead | S | T71 | todo |
 | T77 | Don't invalidate linked-identity mappings on a webhook event carrying no verified email | data | Backend Lead | S | T68 | todo |
-| T78 | Guard /check-email against a superseding remount resend and an unmount-during-resend race | ui | Frontend Lead | M | T69 | todo |
+| T78 | Guard /check-email against a superseding remount resend and an unmount-during-resend race | ui | Frontend Lead | M | T69 | done |
 
 **Total:** 78 tasks (17 original + 20 review-2026-09-03 follow-ups + 15 review-2026-09-03-2 follow-ups + 7 review-2026-09-03-3 follow-ups + 5 review-2026-09-03-4 follow-ups + 9 review-2026-09-03-5 follow-ups + 5 review-2026-09-03-6 follow-ups); 73 done, 5 todo.

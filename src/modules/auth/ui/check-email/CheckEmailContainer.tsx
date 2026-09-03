@@ -28,7 +28,7 @@ function isRateLimited(error: unknown): boolean {
 
 type PollableSignIn = {
   status?: string;
-  firstFactorVerification?: { status?: string } | null;
+  firstFactorVerification?: { status?: string; expireAt?: Date | string | number | null } | null;
   supportedFirstFactors?: { strategy?: string; emailAddressId?: string }[] | null;
   createEmailLinkFlow?: () => {
     startEmailLinkFlow: (opts: {
@@ -43,12 +43,35 @@ type PollableSignIn = {
 // navigating once a resend has cancelled it, or the component has unmounted.
 type PollHandle = { cancelled: boolean; cancel: () => void };
 
+// A refresh, back-navigation, or StrictMode double-invoke remounts this component while the
+// PREVIOUS mount's magic link is still outstanding — calling startEmailLinkFlow again would send
+// a fresh link that supersedes the one already in the Traveler's inbox. The installed
+// @clerk/shared@4.30.2 signIn resource does carry a verifiable signal for this after all:
+// firstFactorVerification.status stays "unverified" (not yet "expired"/"verified"/"failed") with
+// a future expireAt for as long as a previously-prepared link is still valid.
+function hasOutstandingLink(target: PollableSignIn | undefined): boolean {
+  const verification = target?.firstFactorVerification;
+  if (!verification || verification.status !== "unverified" || !verification.expireAt) {
+    return false;
+  }
+  return new Date(verification.expireAt).getTime() > Date.now();
+}
+
 export function CheckEmailContainer({ email, returnTo, isSignUp = false, strings }: CheckEmailContainerProps) {
   const router = useRouter();
   const { signIn, isLoaded, setActive } = useSignIn();
   const { signUp, isLoaded: isSignUpLoaded } = useSignUp();
   const [state, setState] = useState<CheckEmailScreenState>("default");
   const activePollRef = useRef<PollHandle | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      activePollRef.current?.cancel();
+    };
+  }, []);
 
   // AC-02b: the whole point of this screen is that the link gets opened on a DIFFERENT
   // device than this one. Clerk's email-link flow completes the sign-in on the device that
@@ -111,10 +134,11 @@ export function CheckEmailContainer({ email, returnTo, isSignUp = false, strings
     if (!isLoaded || isSignUp) {
       return;
     }
-    pollForCompletion(signIn as unknown as PollableSignIn);
-    return () => {
-      activePollRef.current?.cancel();
-    };
+    const target = signIn as unknown as PollableSignIn;
+    if (hasOutstandingLink(target)) {
+      return;
+    }
+    pollForCompletion(target);
     // Starts once per mount for the signIn resource this screen was navigated for.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoaded]);
@@ -129,10 +153,16 @@ export function CheckEmailContainer({ email, returnTo, isSignUp = false, strings
 
     try {
       await signIn.create({ identifier: email });
+      if (!mountedRef.current) {
+        return;
+      }
       setState("resent-confirmation");
       pollForCompletion(signIn as unknown as PollableSignIn);
       return;
     } catch (error) {
+      if (!mountedRef.current) {
+        return;
+      }
       if (!isFormIdentifierNotFound(error) || !isSignUpLoaded) {
         setState(isRateLimited(error) ? "error-rate-limited" : "error-sign-in-failed");
         return;
@@ -145,8 +175,14 @@ export function CheckEmailContainer({ email, returnTo, isSignUp = false, strings
       // client_mismatch on this link (opened on a second device) isn't reported as a real
       // success (see SsoCallbackContainer's isSignUp).
       await signUp.prepareEmailAddressVerification({ strategy: "email_link", redirectUrl: `${redirectUrl}&signup=1` });
+      if (!mountedRef.current) {
+        return;
+      }
       setState("resent-confirmation");
     } catch (error) {
+      if (!mountedRef.current) {
+        return;
+      }
       setState(isRateLimited(error) ? "error-rate-limited" : "error-sign-in-failed");
     }
   };

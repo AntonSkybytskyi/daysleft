@@ -236,6 +236,75 @@ describe("CheckEmailContainer", () => {
       expect(screen.getByRole("alert")).toBeInTheDocument();
     });
 
+    it("does not send a superseding link on remount while an outstanding unverified link hasn't expired", () => {
+      const startEmailLinkFlow = vi.fn().mockReturnValue(new Promise(() => {}));
+      signInValue = {
+        create: signInCreate,
+        status: "needs_first_factor",
+        supportedFirstFactors: [{ strategy: "email_link", emailAddressId: "idn_1" }],
+        firstFactorVerification: { status: "unverified", expireAt: new Date(Date.now() + 60_000) },
+        createEmailLinkFlow: () => ({ startEmailLinkFlow, cancelEmailLinkFlow: vi.fn() }),
+      };
+
+      render(<CheckEmailContainer email="traveler@example.test" returnTo="/dashboard" />);
+
+      expect(startEmailLinkFlow).not.toHaveBeenCalled();
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
+
+    it("does send on mount when the outstanding link has already expired", () => {
+      const startEmailLinkFlow = vi.fn().mockReturnValue(new Promise(() => {}));
+      signInValue = {
+        create: signInCreate,
+        status: "needs_first_factor",
+        supportedFirstFactors: [{ strategy: "email_link", emailAddressId: "idn_1" }],
+        firstFactorVerification: { status: "expired", expireAt: new Date(Date.now() - 60_000) },
+        createEmailLinkFlow: () => ({ startEmailLinkFlow, cancelEmailLinkFlow: vi.fn() }),
+      };
+
+      render(<CheckEmailContainer email="traveler@example.test" returnTo="/dashboard" />);
+
+      expect(startEmailLinkFlow).toHaveBeenCalled();
+    });
+
+    it("a user-initiated resend still sends, even with an outstanding unexpired link", async () => {
+      signInValue = {
+        create: signInCreate,
+        status: "needs_first_factor",
+        supportedFirstFactors: [{ strategy: "email_link", emailAddressId: "idn_1" }],
+        firstFactorVerification: { status: "unverified", expireAt: new Date(Date.now() + 60_000) },
+        createEmailLinkFlow: () => pendingPoll(),
+      };
+      signInCreate.mockResolvedValue({});
+
+      render(<CheckEmailContainer email="traveler@example.test" returnTo="/dashboard" />);
+      await userEvent.click(screen.getByRole("button", { name: "Resend" }));
+
+      expect(await screen.findByText(/link resent/i)).toBeInTheDocument();
+    });
+
+    it("ignores a signIn.create() resolution that arrives after the component has already unmounted", async () => {
+      let resolveCreate: () => void = () => {};
+      signInCreate.mockImplementation(() => new Promise((resolve) => { resolveCreate = () => resolve({}); }));
+      signInValue = {
+        create: signInCreate,
+        status: "needs_first_factor",
+        supportedFirstFactors: [{ strategy: "email_link", emailAddressId: "idn_1" }],
+        createEmailLinkFlow: () => pendingPoll(),
+      };
+
+      const { unmount } = render(<CheckEmailContainer email="traveler@example.test" returnTo="/dashboard" />);
+      await userEvent.click(screen.getByRole("button", { name: "Resend" }));
+      unmount();
+      resolveCreate();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // No poll should have been started off the back of a resend the page already left.
+      expect(setActive).not.toHaveBeenCalled();
+      expect(replace).not.toHaveBeenCalled();
+    });
+
     it("does not run the sign-in poll guard for a first-time sign-up arrival — the link already sent before navigating here", () => {
       // A sign-up arrival has no needs_first_factor signIn attempt at all (this is a brand-new
       // identifier); the guard would otherwise mistake that absence for a failure.
