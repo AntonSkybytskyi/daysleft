@@ -32,7 +32,7 @@
 | T24 | AC-03 "signed in to existing account" state | ui | Frontend Lead | S | — | done |
 | T25 | Wire remaining i18n keys | ui | Frontend Lead | S | — | done |
 | T26 | svix-id webhook dedupe | infra | Backend Lead | S | — | done |
-| T27 | Distinct email-conflict error code | infra | Backend Lead | S | T26 | todo |
+| T27 | Distinct email-conflict error code | infra | Backend Lead | S | T26 | done |
 | T28 | Thread real return-to path (dashboard 401 + container) | app | Backend Lead | S | — | todo |
 | T29 | Webhook event-type guard + try/catch | infra | Backend Lead | S | T26, T27 | todo |
 | T30 | AppError + unified error envelope | app | Backend Lead | M | — | todo |

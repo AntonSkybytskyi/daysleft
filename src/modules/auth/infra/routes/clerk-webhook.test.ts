@@ -80,6 +80,26 @@ describe("handleClerkWebhook", () => {
     expect(repository.upsertById).not.toHaveBeenCalled();
   });
 
+  it("returns 422 auth.email_conflict when the verified email is already linked to a different account", async () => {
+    const repository = fakeRepository({
+      upsertById: vi.fn().mockResolvedValue({ kind: "email_conflict" }),
+    });
+    const verify = vi.fn().mockReturnValue({ valid: true, event: JSON.parse(eventPayload()) });
+
+    const result = await handleClerkWebhook(
+      { headers: validHeaders, rawBody: eventPayload() },
+      { webhookSecret, repository, verify },
+    );
+
+    expect(result).toEqual({
+      status: 422,
+      body: {
+        code: "auth.email_conflict",
+        message: "That email is already linked to a different account.",
+      },
+    });
+  });
+
   it("dedupes a redelivery with the same svix-id — a single upsert, the same cached result returned twice", async () => {
     const repository = fakeRepository();
     const verify = vi.fn().mockReturnValue({ valid: true, event: JSON.parse(eventPayload()) });

@@ -66,7 +66,7 @@ export async function handleClerkWebhook(
   if (result.kind === "email_conflict") {
     return {
       status: 422,
-      body: errorBody("auth.email_required", "That email is already linked to a different account."),
+      body: errorBody("auth.email_conflict", "That email is already linked to a different account."),
     };
   }
 

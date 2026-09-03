@@ -72,13 +72,22 @@ paths:
                 code: "auth.webhook_invalid_signature"
                 message: "Webhook signature verification failed."
         "422":
-          description: no verified email in the payload — account creation/linking blocked (sad.md §6 flow 4)
+          description: |
+            account creation/linking blocked — either no verified email in the payload
+            (auth.email_required) or the verified email is already linked to a different
+            account (auth.email_conflict; sad.md §6 flow 4)
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
-              example:
-                code: "auth.email_required"
-                message: "A verified email is required to create or link an account."
+              examples:
+                emailRequired:
+                  value:
+                    code: "auth.email_required"
+                    message: "A verified email is required to create or link an account."
+                emailConflict:
+                  value:
+                    code: "auth.email_conflict"
+                    message: "That email is already linked to a different account."
 
   /api/v1/dashboard:
     get:
