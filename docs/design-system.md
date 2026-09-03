@@ -41,7 +41,7 @@ Established by `auth-user-plus-dashboard` (first UI feature), `src/modules/ui/`:
 | `LinkButton` | `src/modules/ui/LinkButton/LinkButton.tsx` | default, loading | text-styled inline action (e.g. "Resend") |
 | `OAuthProviderButton` | `src/modules/ui/OAuthProviderButton/OAuthProviderButton.tsx` | google, github, loading | provider-branded button, full width |
 | `EmailInput` | `src/modules/ui/EmailInput/EmailInput.tsx` | default, error | labeled email field, `aria-invalid` + associated error text |
-| `Alert` | `src/modules/ui/Alert/Alert.tsx` | info (`role=status`), error (`role=alert`) | inline banner |
+| `Alert` | `src/modules/ui/Alert/Alert.tsx` | info (`role=status`), success (`role=status`), error (`role=alert`) | inline banner |
 | `Spinner` | `src/modules/ui/Spinner/Spinner.tsx` | standalone, embedded | `role=status`; embedding components override the host's `aria-label` so it doesn't leak "Loading" into the button's accessible name |
 | `Header` | `src/modules/ui/Header/Header.tsx` | with/without logout action | app-shell header, composes `Button` |
 | `EmptyState` | `src/modules/ui/EmptyState/EmptyState.tsx` | default | heading + body message |

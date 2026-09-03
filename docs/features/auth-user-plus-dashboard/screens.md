@@ -169,11 +169,11 @@ docs/design-system.md when `implement` builds it. -->
 
 | Component | Why no existing primitive fits | Registered in design-system |
 |---|---|---|
-| `OAuthProviderButton` | Provider-branded button (Google/GitHub) with a loading variant; inventory is empty | pending |
-| `EmailInput` | Labeled email field with inline validation; inventory is empty | pending |
-| `Button` | Generic primary/secondary action button; inventory is empty | pending |
-| `LinkButton` | Text-styled inline action (e.g. "Resend"); inventory is empty | pending |
-| `Alert` | Info/success/error banner variant; inventory is empty | pending |
-| `Spinner` | Loading indicator, standalone or inline in a button | pending |
-| `Header` | App-shell header carrying the logout action | pending |
-| `EmptyState` | Illustration + message for "nothing tracked yet" | pending |
+| `OAuthProviderButton` | Provider-branded button (Google/GitHub) with a loading variant; inventory is empty | registered |
+| `EmailInput` | Labeled email field with inline validation; inventory is empty | registered |
+| `Button` | Generic primary/secondary action button; inventory is empty | registered |
+| `LinkButton` | Text-styled inline action (e.g. "Resend"); inventory is empty | registered |
+| `Alert` | Info/success/error banner variant; inventory is empty | registered |
+| `Spinner` | Loading indicator, standalone or inline in a button | registered |
+| `Header` | App-shell header carrying the logout action | registered |
+| `EmptyState` | Illustration + message for "nothing tracked yet" | registered |
