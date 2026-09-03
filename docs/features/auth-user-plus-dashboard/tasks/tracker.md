@@ -25,7 +25,7 @@
 
 | T18 | Fix open redirect at /login + tautological QG-1 test | wiring | Backend Lead | S | — | done |
 | T19 | /sso-callback route (OAuth + magic-link completion) | ui | Frontend Lead | S | T18 | todo |
-| T20 | /check-email route | ui | Frontend Lead | S | — | todo |
+| T20 | /check-email route | ui | Frontend Lead | S | — | done |
 | T21 | Render SCR-04 on invalid callback | ui | Frontend Lead | S | T19 | todo |
 | T22 | Wire AC-01b sign-in-failed error | wiring | Frontend Lead | S | T19 | todo |
 | T23 | Surface AC-03b email-required error | app | Backend Lead | S | — | todo |
