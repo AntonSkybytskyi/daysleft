@@ -26,6 +26,10 @@ export function resolveRevertTarget(migrationsDir: string): RevertTarget | null 
     return null;
   }
 
+  if (!Number.isFinite(last.when)) {
+    throw new Error(`Journal entry ${last.tag} has a non-numeric \`when\` (${JSON.stringify(last.when)})`);
+  }
+
   const downPath = path.resolve(migrationsDir, `${last.tag}.down.sql`);
   if (!existsSync(downPath)) {
     throw new Error(`No down migration found for ${last.tag} at ${downPath}`);

@@ -1,5 +1,6 @@
 import { PGlite } from "@electric-sql/pglite";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { applyRevert, resolveRevertTarget } from "../../../scripts/migrate-down";
@@ -111,5 +112,21 @@ describe("migrate-down round trip (up -> down -> up)", () => {
     ]);
 
     expect(await tableExists(table)).toBe(true);
+  });
+
+  it("resolveRevertTarget rejects a journal entry whose `when` isn't a finite number, instead of building a broken DELETE", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "migrate-down-test-"));
+    try {
+      mkdirSync(path.join(dir, "meta"), { recursive: true });
+      writeFileSync(
+        path.join(dir, "meta", "_journal.json"),
+        JSON.stringify({ entries: [{ tag: "0000_bad", when: "not-a-number" }] }),
+      );
+      writeFileSync(path.join(dir, "0000_bad.down.sql"), `DROP TABLE IF EXISTS "whatever";`);
+
+      expect(() => resolveRevertTarget(dir)).toThrow(/when/i);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

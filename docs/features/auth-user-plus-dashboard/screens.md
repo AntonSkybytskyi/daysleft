@@ -94,7 +94,7 @@ updated_at: "2026-09-03"
 | loading | Resend requested, in flight | `LinkButton` (loading), `Spinner` | wireframe below |
 | resent-confirmation | Resend succeeded | `Alert` (success) | wireframe below |
 | error-rate-limited | Magic-link send rate exceeded (spec §6 NFR ≤5/email/hour, sad.md §8 risk) | `Alert` (error) | wireframe below |
-| error-sign-in-failed | Resend failed for a reason other than rate-limiting (AC-02b) | `Alert` (error), `LinkButton` ("Resend") | wireframe below |
+| error-sign-in-failed | Resend failed for a reason other than rate-limiting (AC-02) | `Alert` (error), `LinkButton` ("Resend") | wireframe below |
 | empty | N/A — this screen always shows the confirmation content; no data-driven empty case | — |
 
 ```text
