@@ -5,7 +5,10 @@ import { EmailLinkErrorCodeStatus, isEmailLinkError } from "@clerk/nextjs/errors
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Spinner } from "@/modules/ui/Spinner/Spinner";
-import { MagicLinkInvalidScreen } from "@/modules/auth/ui/magic-link-invalid/MagicLinkInvalidScreen";
+import {
+  MagicLinkInvalidScreen,
+  type MagicLinkInvalidScreenStrings,
+} from "@/modules/auth/ui/magic-link-invalid/MagicLinkInvalidScreen";
 
 export type SsoCallbackDeps = {
   handleRedirectCallback: (opts: {
@@ -22,6 +25,7 @@ export type SsoCallbackContainerProps = {
   returnTo: string;
   flow?: "email_link" | "oauth";
   deps?: SsoCallbackDeps;
+  strings?: Partial<MagicLinkInvalidScreenStrings>;
 };
 
 function isInvalidEmailLink(error: unknown): boolean {
@@ -32,7 +36,7 @@ function isInvalidEmailLink(error: unknown): boolean {
   return code === EmailLinkErrorCodeStatus.Expired || code === EmailLinkErrorCodeStatus.Failed;
 }
 
-export function SsoCallbackContainer({ returnTo, flow = "oauth", deps }: SsoCallbackContainerProps) {
+export function SsoCallbackContainer({ returnTo, flow = "oauth", deps, strings }: SsoCallbackContainerProps) {
   const router = useRouter();
   const clerk = useClerk();
   const [linkInvalid, setLinkInvalid] = useState(false);
@@ -65,7 +69,9 @@ export function SsoCallbackContainer({ returnTo, flow = "oauth", deps }: SsoCall
   }, []);
 
   if (linkInvalid) {
-    return <MagicLinkInvalidScreen state="default" onSendNewLink={() => router.replace("/login")} />;
+    return (
+      <MagicLinkInvalidScreen state="default" onSendNewLink={() => router.replace("/login")} strings={strings} />
+    );
   }
 
   return (

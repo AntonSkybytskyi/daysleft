@@ -73,6 +73,20 @@ describe("SsoCallbackContainer — email-link flow", () => {
     expect(replace).not.toHaveBeenCalled();
   });
 
+  it("renders SCR-04 with the strings passed down from the page (i18n), not hardcoded English", async () => {
+    const handleEmailLinkVerification = vi.fn().mockRejectedValue(emailLinkError(EmailLinkErrorCodeStatus.Expired));
+    render(
+      <SsoCallbackContainer
+        returnTo="/dashboard"
+        flow="email_link"
+        deps={{ handleEmailLinkVerification } as never}
+        strings={{ heading: "Посилання більше не дійсне" }}
+      />,
+    );
+
+    expect(await screen.findByText("Посилання більше не дійсне")).toBeInTheDocument();
+  });
+
   it("renders SCR-04 on a real EmailLinkError with code=failed", async () => {
     const handleEmailLinkVerification = vi.fn().mockRejectedValue(emailLinkError(EmailLinkErrorCodeStatus.Failed));
     render(
