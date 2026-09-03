@@ -48,7 +48,7 @@
 | T39 | Close path-traversal bypass in resolveLoginReturnTo | wiring | Backend Lead | S | — | done |
 | T40 | Verify webhook signature before consulting dedupe cache | infra | Backend Lead | S | — | done |
 | T41 | Persist second identity so the "linked" banner clears | app | Backend Lead | M | — | done |
-| T42 | Wire SCR-04 i18n strings + add dashboard.errorFetchFailed key | ui | Frontend Lead | S | T38 | todo |
+| T42 | Wire SCR-04 i18n strings + add dashboard.errorFetchFailed key | ui | Frontend Lead | S | T38 | done |
 | T43 | Add `linked` field + webhook ignored-event body to openapi.yaml | docs | Backend Lead | S | — | done |
 | T44 | Handle the logout response instead of always redirecting | ui | Frontend Lead | S | — | done |
 | T45 | Fix db:down to actually remove the migration's journal row | migration | Backend Lead | S | — | done |
