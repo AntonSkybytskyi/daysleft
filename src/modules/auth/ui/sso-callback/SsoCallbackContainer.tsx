@@ -1,7 +1,7 @@
 "use client";
 
 import { useClerk } from "@clerk/nextjs";
-import { useSignIn } from "@clerk/nextjs/legacy";
+import { useSignIn, useSignUp } from "@clerk/nextjs/legacy";
 import { EmailLinkErrorCodeStatus, isClerkAPIResponseError, isEmailLinkError } from "@clerk/nextjs/errors";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -21,6 +21,10 @@ export type SsoCallbackDeps = {
     onVerifiedOnOtherDevice?: () => void;
   }) => Promise<unknown>;
   sendMagicLink: (opts: { identifier: string; redirectUrl: string }) => Promise<unknown>;
+  signUp: {
+    create: (opts: { emailAddress: string }) => Promise<unknown>;
+    prepareEmailAddressVerification: (opts: { strategy: "email_link"; redirectUrl: string }) => Promise<unknown>;
+  };
 };
 
 export type SsoCallbackContainerProps = {
@@ -47,12 +51,20 @@ function isRateLimited(error: unknown): boolean {
   return isClerkAPIResponseError(error as Error) && (error as { status?: number }).status === 429;
 }
 
+function isFormIdentifierNotFound(error: unknown): boolean {
+  const errors = (error as { errors?: { code?: string }[] } | undefined)?.errors;
+  return Boolean(errors?.some((entry) => entry.code === "form_identifier_not_found"));
+}
+
 export function SsoCallbackContainer({ returnTo, flow = "oauth", email, deps, strings }: SsoCallbackContainerProps) {
   const router = useRouter();
   const clerk = useClerk();
   const { signIn } = useSignIn();
+  const { signUp } = useSignUp();
   const [linkInvalid, setLinkInvalid] = useState(false);
-  const [resendState, setResendState] = useState<"idle" | "loading" | "error-rate-limited">("idle");
+  const [resendState, setResendState] = useState<"idle" | "loading" | "error-rate-limited" | "error-sign-in-failed">(
+    "idle",
+  );
 
   useEffect(() => {
     if (flow === "email_link") {
@@ -92,11 +104,27 @@ export function SsoCallbackContainer({ returnTo, flow = "oauth", email, deps, st
     const sendMagicLink = deps?.sendMagicLink ?? ((opts) => signIn!.create({ ...opts, strategy: "email_link" }));
     const redirectUrl = `${window.location.origin}/sso-callback?return_to=${encodeURIComponent(returnTo)}&flow=email_link&email=${encodeURIComponent(email)}`;
 
+    const goToCheckEmail = () =>
+      router.replace(`/check-email?email=${encodeURIComponent(email)}&return_to=${encodeURIComponent(returnTo)}`);
+
     try {
       await sendMagicLink({ identifier: email, redirectUrl });
-      router.replace(`/check-email?email=${encodeURIComponent(email)}&return_to=${encodeURIComponent(returnTo)}`);
+      goToCheckEmail();
+      return;
     } catch (error) {
-      setResendState(isRateLimited(error) ? "error-rate-limited" : "idle");
+      const signUpClient = deps?.signUp ?? signUp;
+      if (!isFormIdentifierNotFound(error) || !signUpClient) {
+        setResendState(isRateLimited(error) ? "error-rate-limited" : "error-sign-in-failed");
+        return;
+      }
+
+      try {
+        await signUpClient.create({ emailAddress: email });
+        await signUpClient.prepareEmailAddressVerification({ strategy: "email_link", redirectUrl });
+        goToCheckEmail();
+      } catch (signUpError) {
+        setResendState(isRateLimited(signUpError) ? "error-rate-limited" : "error-sign-in-failed");
+      }
     }
   };
 

@@ -26,4 +26,14 @@ describe("MagicLinkInvalidScreen", () => {
     render(<MagicLinkInvalidScreen state="error-rate-limited" onSendNewLink={vi.fn()} />);
     expect(screen.getByRole("alert")).toHaveTextContent(/too many requests/i);
   });
+
+  it("error-sign-in-failed: shows a visible failure with a way to retry, instead of silently reverting", async () => {
+    const onSendNewLink = vi.fn();
+    render(<MagicLinkInvalidScreen state="error-sign-in-failed" onSendNewLink={onSendNewLink} />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent(/couldn.t send a new link/i);
+
+    await userEvent.click(screen.getByRole("button", { name: "Send a new link" }));
+    expect(onSendNewLink).toHaveBeenCalledOnce();
+  });
 });

@@ -6,6 +6,7 @@ export const stringKeys = [
   "magicLinkInvalid.body",
   "magicLinkInvalid.sendNewLink",
   "magicLinkInvalid.errorRateLimited",
+  "magicLinkInvalid.errorSignInFailed",
 ] as const;
 
 export function resolveStrings(acceptLanguage: string | null): Partial<MagicLinkInvalidScreenStrings> {
@@ -15,5 +16,6 @@ export function resolveStrings(acceptLanguage: string | null): Partial<MagicLink
     body: t["magicLinkInvalid.body"],
     sendNewLink: t["magicLinkInvalid.sendNewLink"],
     errorRateLimited: t["magicLinkInvalid.errorRateLimited"],
+    errorSignInFailed: t["magicLinkInvalid.errorSignInFailed"],
   };
 }

@@ -1,13 +1,14 @@
 import { Alert } from "@/modules/ui/Alert/Alert";
 import { Button } from "@/modules/ui/Button/Button";
 
-export type MagicLinkInvalidScreenState = "default" | "loading" | "error-rate-limited";
+export type MagicLinkInvalidScreenState = "default" | "loading" | "error-rate-limited" | "error-sign-in-failed";
 
 export type MagicLinkInvalidScreenStrings = {
   heading: string;
   body: string;
   sendNewLink: string;
   errorRateLimited: string;
+  errorSignInFailed: string;
 };
 
 const defaultStrings: MagicLinkInvalidScreenStrings = {
@@ -15,6 +16,7 @@ const defaultStrings: MagicLinkInvalidScreenStrings = {
   body: "It may have expired, already been used, or been replaced by a newer one.",
   sendNewLink: "Send a new link",
   errorRateLimited: "Too many requests. Wait a bit before trying again.",
+  errorSignInFailed: "Couldn't send a new link. Try again in a moment.",
 };
 
 export type MagicLinkInvalidScreenProps = {
@@ -32,6 +34,13 @@ export function MagicLinkInvalidScreen({ state, onSendNewLink, strings }: MagicL
 
       {state === "error-rate-limited" ? (
         <Alert variant="error">{t.errorRateLimited}</Alert>
+      ) : state === "error-sign-in-failed" ? (
+        <>
+          <Alert variant="error">{t.errorSignInFailed}</Alert>
+          <Button variant="primary" onClick={onSendNewLink}>
+            {t.sendNewLink}
+          </Button>
+        </>
       ) : (
         <>
           <Alert variant="error">{t.body}</Alert>

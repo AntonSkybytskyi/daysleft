@@ -19,6 +19,7 @@
   "magicLinkInvalid.body": "It may have expired, already been used, or been replaced by a newer one.",
   "magicLinkInvalid.sendNewLink": "Send a new link",
   "magicLinkInvalid.errorRateLimited": "Too many requests. Wait a bit before trying again.",
+  "magicLinkInvalid.errorSignInFailed": "Couldn't send a new link. Try again in a moment.",
   "dashboard.emptyState": "Nothing tracked yet.",
   "dashboard.emptyBody": "Future: add your first trip here.",
   "dashboard.linkedAccount": "Signed in to your existing account.",

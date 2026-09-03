@@ -15,6 +15,7 @@ vi.mock("@clerk/nextjs", () => ({
 
 vi.mock("@clerk/nextjs/legacy", () => ({
   useSignIn: () => ({ signIn: { create: vi.fn() } }),
+  useSignUp: () => ({ signUp: undefined }),
 }));
 
 afterEach(() => {
@@ -174,6 +175,55 @@ describe("SsoCallbackContainer — email-link flow", () => {
     await userEvent.click(screen.getByRole("button", { name: /send a new link/i }));
 
     expect(screen.getByRole("button", { name: /send a new link/i })).toBeDisabled();
+  });
+
+  it("falls back to sign-up when the email has no existing sign-in account (form_identifier_not_found)", async () => {
+    const handleEmailLinkVerification = vi.fn().mockRejectedValue(emailLinkError(EmailLinkErrorCodeStatus.Expired));
+    const clerkError = Object.assign(new Error("not found"), { errors: [{ code: "form_identifier_not_found" }] });
+    const sendMagicLink = vi.fn().mockRejectedValue(clerkError);
+    const signUpCreate = vi.fn().mockResolvedValue(undefined);
+    const prepareEmailAddressVerification = vi.fn().mockResolvedValue(undefined);
+    render(
+      <SsoCallbackContainer
+        returnTo="/dashboard"
+        flow="email_link"
+        email="traveler@example.test"
+        deps={
+          {
+            handleEmailLinkVerification,
+            sendMagicLink,
+            signUp: { create: signUpCreate, prepareEmailAddressVerification },
+          } as never
+        }
+      />,
+    );
+
+    await screen.findByText(/no longer valid/i);
+    await userEvent.click(screen.getByRole("button", { name: /send a new link/i }));
+
+    await vi.waitFor(() => expect(signUpCreate).toHaveBeenCalledWith({ emailAddress: "traveler@example.test" }));
+    expect(prepareEmailAddressVerification).toHaveBeenCalledWith(
+      expect.objectContaining({ strategy: "email_link" }),
+    );
+    expect(replace).toHaveBeenCalledWith(expect.stringContaining("/check-email"));
+  });
+
+  it("shows a visible error-sign-in-failed state (not a silent revert to default) when resend fails for a non-429, non-sign-up reason", async () => {
+    const handleEmailLinkVerification = vi.fn().mockRejectedValue(emailLinkError(EmailLinkErrorCodeStatus.Expired));
+    const sendMagicLink = vi.fn().mockRejectedValue(new Error("network down"));
+    render(
+      <SsoCallbackContainer
+        returnTo="/dashboard"
+        flow="email_link"
+        email="traveler@example.test"
+        deps={{ handleEmailLinkVerification, sendMagicLink } as never}
+      />,
+    );
+
+    await screen.findByText(/no longer valid/i);
+    await userEvent.click(screen.getByRole("button", { name: /send a new link/i }));
+
+    expect(await screen.findByText(/couldn.t send a new link/i)).toBeInTheDocument();
   });
 
   it("shows error-rate-limited on a real 429 when re-sending the new link", async () => {
