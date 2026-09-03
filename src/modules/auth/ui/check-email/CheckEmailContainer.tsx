@@ -2,13 +2,14 @@
 
 import { useSignIn } from "@clerk/nextjs/legacy";
 import { useState } from "react";
-import { CheckEmailScreen, type CheckEmailScreenState } from "./CheckEmailScreen";
+import { CheckEmailScreen, type CheckEmailScreenState, type CheckEmailScreenStrings } from "./CheckEmailScreen";
 
 export type CheckEmailContainerProps = {
   email: string;
+  strings?: Partial<CheckEmailScreenStrings>;
 };
 
-export function CheckEmailContainer({ email }: CheckEmailContainerProps) {
+export function CheckEmailContainer({ email, strings }: CheckEmailContainerProps) {
   const { signIn, isLoaded } = useSignIn();
   const [state, setState] = useState<CheckEmailScreenState>("default");
 
@@ -29,5 +30,5 @@ export function CheckEmailContainer({ email }: CheckEmailContainerProps) {
     }
   };
 
-  return <CheckEmailScreen state={state} email={email} onResend={handleResend} />;
+  return <CheckEmailScreen state={state} email={email} onResend={handleResend} strings={strings} />;
 }

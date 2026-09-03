@@ -70,4 +70,18 @@ describe("LoginScreen", () => {
     expect(screen.getByRole("status")).toHaveTextContent(/sign in to continue/i);
     expect(screen.getByLabelText("Email")).toBeInTheDocument();
   });
+
+  it("renders translated strings when supplied (proves the text is not hardcoded)", () => {
+    const props = baseProps();
+    render(
+      <LoginScreen
+        state="default"
+        {...props}
+        strings={{ continueWithGoogle: "Continuer avec Google", sendMagicLink: "Envoyer le lien" }}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Continuer avec Google" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Envoyer le lien" })).toBeInTheDocument();
+  });
 });

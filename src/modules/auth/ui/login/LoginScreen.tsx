@@ -10,6 +10,28 @@ export type LoginScreenState =
   | "error-email-required"
   | "redirected-sign-in-required";
 
+export type LoginScreenStrings = {
+  continueWithGoogle: string;
+  continueWithGithub: string;
+  emailLabel: string;
+  emailPlaceholder: string;
+  sendMagicLink: string;
+  errorSignInFailed: string;
+  errorEmailRequired: string;
+  redirectedSignInRequired: string;
+};
+
+const defaultStrings: LoginScreenStrings = {
+  continueWithGoogle: "Continue with Google",
+  continueWithGithub: "Continue with GitHub",
+  emailLabel: "Email",
+  emailPlaceholder: "you@example.com",
+  sendMagicLink: "Send magic link",
+  errorSignInFailed: "Sign-in didn't complete. Try again with any method below.",
+  errorEmailRequired: "Your provider didn't share a verified email. Make one visible or verified, then try again.",
+  redirectedSignInRequired: "Sign in to continue.",
+};
+
 export type LoginScreenProps = {
   state: LoginScreenState;
   email: string;
@@ -19,6 +41,7 @@ export type LoginScreenProps = {
   onSendMagicLink: () => void;
   loadingProvider?: "google" | "github" | "email";
   heading?: string;
+  strings?: Partial<LoginScreenStrings>;
 };
 
 export function LoginScreen({
@@ -30,43 +53,27 @@ export function LoginScreen({
   onSendMagicLink,
   loadingProvider,
   heading = "Sign in to daysleft",
+  strings,
 }: LoginScreenProps) {
+  const t = { ...defaultStrings, ...strings };
   const showEmailField = state !== "error-email-required";
 
   return (
     <div className="mx-auto flex max-w-sm flex-col gap-4 px-6 py-16">
       <h1 className="text-lg font-semibold text-slate-900">{heading}</h1>
 
-      {state === "error-sign-in-failed" && (
-        <Alert variant="error">Sign-in didn&apos;t complete. Try again with any method below.</Alert>
-      )}
-      {state === "error-email-required" && (
-        <Alert variant="error">
-          Your provider didn&apos;t share a verified email. Make one visible or verified, then try again.
-        </Alert>
-      )}
-      {state === "redirected-sign-in-required" && <Alert variant="info">Sign in to continue.</Alert>}
+      {state === "error-sign-in-failed" && <Alert variant="error">{t.errorSignInFailed}</Alert>}
+      {state === "error-email-required" && <Alert variant="error">{t.errorEmailRequired}</Alert>}
+      {state === "redirected-sign-in-required" && <Alert variant="info">{t.redirectedSignInRequired}</Alert>}
 
-      <OAuthProviderButton
-        provider="google"
-        onClick={onGoogleClick}
-        loading={state === "loading" && loadingProvider === "google"}
-      />
-      <OAuthProviderButton
-        provider="github"
-        onClick={onGithubClick}
-        loading={state === "loading" && loadingProvider === "github"}
-      />
+      <OAuthProviderButton provider="google" label={t.continueWithGoogle} onClick={onGoogleClick} loading={state === "loading" && loadingProvider === "google"} />
+      <OAuthProviderButton provider="github" label={t.continueWithGithub} onClick={onGithubClick} loading={state === "loading" && loadingProvider === "github"} />
 
       {showEmailField && (
         <>
-          <EmailInput label="Email" value={email} onChange={onEmailChange} placeholder="you@example.com" />
-          <Button
-            variant="primary"
-            onClick={onSendMagicLink}
-            loading={state === "loading" && loadingProvider === "email"}
-          >
-            Send magic link
+          <EmailInput label={t.emailLabel} value={email} onChange={onEmailChange} placeholder={t.emailPlaceholder} />
+          <Button variant="primary" onClick={onSendMagicLink} loading={state === "loading" && loadingProvider === "email"}>
+            {t.sendMagicLink}
           </Button>
         </>
       )}

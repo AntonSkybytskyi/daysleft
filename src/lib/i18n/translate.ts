@@ -18,3 +18,10 @@ export function translate(key: string, acceptLanguage?: string | null): string {
   const catalog = catalogs[resolveLocale(acceptLanguage)] ?? catalogs[defaultLocale];
   return catalog[key] ?? key;
 }
+
+export function translateAll<K extends string>(
+  keys: readonly K[],
+  acceptLanguage?: string | null,
+): Record<K, string> {
+  return Object.fromEntries(keys.map((key) => [key, translate(key, acceptLanguage)])) as Record<K, string>;
+}

@@ -33,4 +33,17 @@ describe("DashboardScreen", () => {
 
     expect(screen.queryByText(/signed in to your existing account/i)).not.toBeInTheDocument();
   });
+
+  it("renders translated strings when supplied (proves the text is not hardcoded)", () => {
+    render(
+      <DashboardScreen
+        state="default"
+        onLogout={vi.fn()}
+        strings={{ emptyHeading: "Rien à suivre.", logout: "Se déconnecter" }}
+      />,
+    );
+
+    expect(screen.getByText("Rien à suivre.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Se déconnecter" })).toBeInTheDocument();
+  });
 });

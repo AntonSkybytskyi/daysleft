@@ -1,8 +1,33 @@
 import { headers } from "next/headers";
-import { translate } from "@/lib/i18n/translate";
+import { translate, translateAll } from "@/lib/i18n/translate";
 import { LoginContainer } from "@/modules/auth/ui/login/LoginContainer";
 import { resolveLoginReturnTo } from "@/modules/dashboard/app/return-to";
-import type { LoginScreenState } from "@/modules/auth/ui/login/LoginScreen";
+import type { LoginScreenState, LoginScreenStrings } from "@/modules/auth/ui/login/LoginScreen";
+
+const stringKeys = [
+  "login.continueWithGoogle",
+  "login.continueWithGithub",
+  "login.emailLabel",
+  "login.emailPlaceholder",
+  "login.sendMagicLink",
+  "login.errorSignInFailed",
+  "login.errorEmailRequired",
+  "login.redirectedSignInRequired",
+] as const;
+
+function resolveStrings(acceptLanguage: string | null): Partial<LoginScreenStrings> {
+  const t = translateAll(stringKeys, acceptLanguage);
+  return {
+    continueWithGoogle: t["login.continueWithGoogle"],
+    continueWithGithub: t["login.continueWithGithub"],
+    emailLabel: t["login.emailLabel"],
+    emailPlaceholder: t["login.emailPlaceholder"],
+    sendMagicLink: t["login.sendMagicLink"],
+    errorSignInFailed: t["login.errorSignInFailed"],
+    errorEmailRequired: t["login.errorEmailRequired"],
+    redirectedSignInRequired: t["login.redirectedSignInRequired"],
+  };
+}
 
 type LoginPageProps = {
   searchParams: { return_to?: string; error?: string };
@@ -32,6 +57,11 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
   );
 
   return (
-    <LoginContainer heading={heading} returnTo={returnTo} initialState={resolveState(searchParams)} />
+    <LoginContainer
+      heading={heading}
+      returnTo={returnTo}
+      initialState={resolveState(searchParams)}
+      strings={resolveStrings(acceptLanguage)}
+    />
   );
 }

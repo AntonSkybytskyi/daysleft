@@ -3,15 +3,16 @@
 import { useSignIn } from "@clerk/nextjs/legacy";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { LoginScreen, type LoginScreenState } from "./LoginScreen";
+import { LoginScreen, type LoginScreenState, type LoginScreenStrings } from "./LoginScreen";
 
 export type LoginContainerProps = {
   heading: string;
   returnTo: string;
   initialState: LoginScreenState;
+  strings?: Partial<LoginScreenStrings>;
 };
 
-export function LoginContainer({ heading, returnTo, initialState }: LoginContainerProps) {
+export function LoginContainer({ heading, returnTo, initialState, strings }: LoginContainerProps) {
   const { signIn, isLoaded } = useSignIn();
   const router = useRouter();
   const [state, setState] = useState<LoginScreenState>(initialState);
@@ -63,6 +64,7 @@ export function LoginContainer({ heading, returnTo, initialState }: LoginContain
       onGithubClick={withOAuth("oauth_github", "github")}
       onSendMagicLink={handleSendMagicLink}
       loadingProvider={loadingProvider}
+      strings={strings}
     />
   );
 }

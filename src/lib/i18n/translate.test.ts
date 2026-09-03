@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { translate } from "./translate";
+import { translate, translateAll } from "./translate";
 
 describe("translate", () => {
   it("resolves a key from en.json for a supported Accept-Language", () => {
@@ -16,5 +16,14 @@ describe("translate", () => {
 
   it("returns the key itself when it has no catalog entry", () => {
     expect(translate("nonexistent.key")).toBe("nonexistent.key");
+  });
+});
+
+describe("translateAll", () => {
+  it("resolves a batch of keys into a single record", () => {
+    expect(translateAll(["login.heading", "dashboard.logout"] as const, "en-US")).toEqual({
+      "login.heading": "Sign in to daysleft",
+      "dashboard.logout": "Log out",
+    });
   });
 });

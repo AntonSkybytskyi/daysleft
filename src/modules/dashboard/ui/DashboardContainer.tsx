@@ -2,9 +2,13 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { DashboardScreen } from "./DashboardScreen";
+import { DashboardScreen, type DashboardScreenStrings } from "./DashboardScreen";
 
-export function DashboardContainer() {
+export type DashboardContainerProps = {
+  strings?: Partial<DashboardScreenStrings>;
+};
+
+export function DashboardContainer({ strings }: DashboardContainerProps = {}) {
   const router = useRouter();
   const [loaded, setLoaded] = useState(false);
   const [linked, setLinked] = useState(false);
@@ -39,5 +43,12 @@ export function DashboardContainer() {
     router.replace("/login");
   };
 
-  return <DashboardScreen state={loaded ? "default" : "loading"} onLogout={handleLogout} linked={linked} />;
+  return (
+    <DashboardScreen
+      state={loaded ? "default" : "loading"}
+      onLogout={handleLogout}
+      linked={linked}
+      strings={strings}
+    />
+  );
 }
