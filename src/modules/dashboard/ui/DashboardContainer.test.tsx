@@ -197,7 +197,7 @@ describe("DashboardContainer", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it("gives up retrying clerk.signOut() after a bounded number of attempts and still redirects, since the server already revoked the session", async () => {
+  it("gives up retrying clerk.signOut() after exactly 3 attempts and surfaces a failure instead of claiming a possibly-live session is gone", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce({ status: 200, json: async () => ({ user: { id: "u1", email: "a@b.com" }, has_trips: false }) })
@@ -210,9 +210,33 @@ describe("DashboardContainer", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Log out" }));
 
-    await waitFor(() => expect(replace).toHaveBeenCalledWith("/login"));
-    expect(signOut.mock.calls.length).toBeGreaterThan(1);
+    // The server already revoked the session (204), but if the client-side signOut() keeps
+    // failing, the client may still hold a live session — redirecting to /login here would
+    // falsely tell the Traveler they're signed out. A real bound (not a loose > 1), and a
+    // failure state instead of an optimistic redirect.
+    expect(await screen.findByRole("alert")).toHaveTextContent(/couldn.t sign you out/i);
+    expect(signOut).toHaveBeenCalledTimes(3);
     expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(replace).not.toHaveBeenCalledWith("/login");
+  });
+
+  it("waits between clerk.signOut() retry attempts instead of firing them back-to-back", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ status: 200, json: async () => ({ user: { id: "u1", email: "a@b.com" }, has_trips: false }) })
+      .mockResolvedValueOnce({ status: 204 });
+    vi.stubGlobal("fetch", fetchMock);
+    signOut.mockRejectedValueOnce(new Error("blip 1")).mockResolvedValueOnce(undefined);
+    const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+
+    render(<DashboardContainer />);
+    await waitFor(() => expect(screen.getByText(/nothing tracked yet/i)).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole("button", { name: "Log out" }));
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/login"));
+    expect(setTimeoutSpy).toHaveBeenCalled();
+    setTimeoutSpy.mockRestore();
   });
 
   it("shows a logout-specific error (not the dashboard-fetch one) instead of redirecting when the logout request rejects (network failure)", async () => {

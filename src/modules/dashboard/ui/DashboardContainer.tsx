@@ -72,15 +72,25 @@ export function DashboardContainer({ strings }: DashboardContainerProps = {}) {
     // retry signOut() itself a bounded number of times, so a transient client-side blip
     // doesn't leave a live Clerk session behind after we tell the user they're signed out.
     const maxSignOutAttempts = 3;
+    const retryBackoffMs = 300;
     for (let attempt = 1; attempt <= maxSignOutAttempts; attempt += 1) {
       try {
         await clerk.signOut();
-        break;
+        router.replace("/login");
+        return;
       } catch {
-        // retry, up to maxSignOutAttempts
+        if (attempt < maxSignOutAttempts) {
+          // A back-to-back retry gives a transient blip no real chance to clear; a short
+          // wait between attempts does.
+          await new Promise((resolve) => setTimeout(resolve, retryBackoffMs));
+        }
       }
     }
-    router.replace("/login");
+    // Every attempt failed — the client may still hold a live session. Redirecting here would
+    // falsely tell the Traveler they're signed out, so surface a failure instead of an
+    // optimistic redirect (the server-side session is already gone; only the client-side one
+    // is in doubt, so nothing more to retry on the server).
+    setStatus("error-logout-failed");
   };
 
   return <DashboardScreen state={status} onLogout={handleLogout} linked={linked} strings={strings} />;

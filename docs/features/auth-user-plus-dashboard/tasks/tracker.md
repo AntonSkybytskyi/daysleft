@@ -86,7 +86,7 @@
 
 | T74 | Stop T66's guard from firing a false error on the sign-up fallback path into /check-email | ui | Frontend Lead | S | T66 | done |
 | T75 | Close AC-02b's sign-up sub-branch gap in the artifact trio and give the sign-in dead end a CTA | docs | Backend Lead | S | T65, T67 | todo |
-| T76 | Give T71's logout retry real backoff and a genuine force-clear on exhaustion | app | Frontend Lead | S | T71 | todo |
+| T76 | Give T71's logout retry real backoff and a genuine force-clear on exhaustion | app | Frontend Lead | S | T71 | done |
 | T77 | Don't invalidate linked-identity mappings on a webhook event carrying no verified email | data | Backend Lead | S | T68 | done |
 | T78 | Guard /check-email against a superseding remount resend and an unmount-during-resend race | ui | Frontend Lead | M | T69 | done |
 
