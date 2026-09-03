@@ -25,8 +25,11 @@ export type ClerkWebhookResult = {
   body: unknown;
 };
 
-type ClerkEmailAddress = { email_address: string; verification: { status: string } };
-type ClerkEventData = { id: string; email_addresses: ClerkEmailAddress[] };
+type ClerkEmailAddress = { email_address: string; verification: { status: string } | null };
+type ClerkEventData = { id: string; email_addresses?: ClerkEmailAddress[] };
+type ClerkEvent = { type: string; data: ClerkEventData };
+
+const handledEventTypes = new Set(["user.created", "user.updated"]);
 
 export async function handleClerkWebhook(
   request: ClerkWebhookRequest,
@@ -48,8 +51,14 @@ export async function handleClerkWebhook(
     };
   }
 
-  const data = verification.event.data as ClerkEventData;
-  const verifiedEntry = data.email_addresses.find((entry) => entry.verification.status === "verified");
+  const event = verification.event as ClerkEvent;
+  if (!handledEventTypes.has(event.type)) {
+    return { status: 200, body: { ignored: true, type: event.type } };
+  }
+
+  const data = event.data;
+  const emailAddresses = Array.isArray(data.email_addresses) ? data.email_addresses : [];
+  const verifiedEntry = emailAddresses.find((entry) => entry.verification?.status === "verified");
   const verifiedEmail = verifiedEntry?.email_address ?? null;
 
   const existing = verifiedEmail ? await deps.repository.findByEmail(verifiedEmail) : null;

@@ -100,6 +100,48 @@ describe("handleClerkWebhook", () => {
     });
   });
 
+  it("returns 200 and ignores a non-user event type without touching the repository", async () => {
+    const repository = fakeRepository();
+    const payload = JSON.stringify({ type: "session.created", data: { id: "sess_1" } });
+    const verify = vi.fn().mockReturnValue({ valid: true, event: JSON.parse(payload) });
+
+    const result = await handleClerkWebhook({ headers: validHeaders, rawBody: payload }, { webhookSecret, repository, verify });
+
+    expect(result.status).toBe(200);
+    expect(repository.upsertById).not.toHaveBeenCalled();
+    expect(repository.findByEmail).not.toHaveBeenCalled();
+  });
+
+  it("returns 200 and ignores a user.deleted event without crashing on the missing email_addresses shape", async () => {
+    const repository = fakeRepository();
+    const payload = JSON.stringify({ type: "user.deleted", data: { id: "user_1", deleted: true } });
+    const verify = vi.fn().mockReturnValue({ valid: true, event: JSON.parse(payload) });
+
+    const result = await handleClerkWebhook({ headers: validHeaders, rawBody: payload }, { webhookSecret, repository, verify });
+
+    expect(result.status).toBe(200);
+    expect(repository.upsertById).not.toHaveBeenCalled();
+  });
+
+  it("does not crash when an email entry carries a null verification (guards the field, doesn't count it as verified)", async () => {
+    const repository = fakeRepository();
+    const payload = JSON.stringify({
+      type: "user.created",
+      data: {
+        id: "user_1",
+        email_addresses: [{ email_address: "traveler@example.test", verification: null }],
+      },
+    });
+    const verify = vi.fn().mockReturnValue({ valid: true, event: JSON.parse(payload) });
+
+    const result = await handleClerkWebhook({ headers: validHeaders, rawBody: payload }, { webhookSecret, repository, verify });
+
+    expect(result).toEqual({
+      status: 422,
+      body: { code: "auth.email_required", message: "A verified email is required to create or link an account." },
+    });
+  });
+
   it("dedupes a redelivery with the same svix-id — a single upsert, the same cached result returned twice", async () => {
     const repository = fakeRepository();
     const verify = vi.fn().mockReturnValue({ valid: true, event: JSON.parse(eventPayload()) });

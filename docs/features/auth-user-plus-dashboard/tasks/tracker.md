@@ -34,7 +34,7 @@
 | T26 | svix-id webhook dedupe | infra | Backend Lead | S | — | done |
 | T27 | Distinct email-conflict error code | infra | Backend Lead | S | T26 | done |
 | T28 | Thread real return-to path (dashboard 401 + container) | app | Backend Lead | S | — | done |
-| T29 | Webhook event-type guard + try/catch | infra | Backend Lead | S | T26, T27 | todo |
+| T29 | Webhook event-type guard + try/catch | infra | Backend Lead | S | T26, T27 | done |
 | T30 | AppError + unified error envelope | app | Backend Lead | M | — | done |
 | T31 | Postgres client singleton + env validation | infra | Backend Lead | S | — | done |
 | T32 | Magic-link sign-up fallback | ui | Frontend Lead | S | — | done |
