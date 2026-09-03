@@ -90,4 +90,36 @@ describe("DashboardContainer", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/v1/auth/logout", { method: "POST" });
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/login"));
   });
+
+  it("shows an error instead of redirecting when the logout request fails server-side (no client-side-only logout)", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ status: 200, json: async () => ({ user: { id: "u1", email: "a@b.com" }, has_trips: false }) })
+      .mockResolvedValueOnce({ status: 500 });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<DashboardContainer />);
+    await waitFor(() => expect(screen.getByText(/nothing tracked yet/i)).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole("button", { name: "Log out" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/couldn.t load your dashboard/i);
+    expect(replace).not.toHaveBeenCalledWith("/login");
+  });
+
+  it("shows an error instead of redirecting when the logout request rejects (network failure)", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ status: 200, json: async () => ({ user: { id: "u1", email: "a@b.com" }, has_trips: false }) })
+      .mockRejectedValueOnce(new Error("network down"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<DashboardContainer />);
+    await waitFor(() => expect(screen.getByText(/nothing tracked yet/i)).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole("button", { name: "Log out" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/couldn.t load your dashboard/i);
+    expect(replace).not.toHaveBeenCalledWith("/login");
+  });
 });

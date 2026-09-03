@@ -52,8 +52,18 @@ export function DashboardContainer({ strings }: DashboardContainerProps = {}) {
   }, []);
 
   const handleLogout = async () => {
-    await fetch("/api/v1/auth/logout", { method: "POST" });
-    router.replace("/login");
+    try {
+      const response = await fetch("/api/v1/auth/logout", { method: "POST" });
+      if (response.status !== 204) {
+        // The Clerk session may still be live — never tell the Traveler they're signed out
+        // when the server didn't actually revoke it.
+        setStatus("error");
+        return;
+      }
+      router.replace("/login");
+    } catch {
+      setStatus("error");
+    }
   };
 
   return <DashboardScreen state={status} onLogout={handleLogout} linked={linked} strings={strings} />;
