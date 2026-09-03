@@ -44,4 +44,20 @@
 | T36 | Register Alert success variant | docs | Frontend Lead | S | — | done |
 | T37 | Replace skipped e2e stubs with real coverage | tests | Frontend Lead | M | T18, T19, T20, T21, T22, T23 | done |
 
-**Total:** 37 tasks, all done (17 original + 20 review-2026-09-03 follow-ups), ~9 + ~7 person-days.
+| T38 | Use Clerk's email-link verification API for magic-link completion | ui | Frontend Lead | M | — | todo |
+| T39 | Close path-traversal bypass in resolveLoginReturnTo | wiring | Backend Lead | S | — | todo |
+| T40 | Verify webhook signature before consulting dedupe cache | infra | Backend Lead | S | — | todo |
+| T41 | Persist second identity so the "linked" banner clears | app | Backend Lead | M | — | todo |
+| T42 | Wire SCR-04 i18n strings + add dashboard.errorFetchFailed key | ui | Frontend Lead | S | T38 | todo |
+| T43 | Add `linked` field + webhook ignored-event body to openapi.yaml | docs | Backend Lead | S | — | todo |
+| T44 | Handle the logout response instead of always redirecting | ui | Frontend Lead | S | — | todo |
+| T45 | Fix db:down to actually remove the migration's journal row | migration | Backend Lead | S | — | todo |
+| T46 | Distinct error code for the session-side email-conflict case | app | Backend Lead | S | — | todo |
+| T47 | Wire Clerk testing-token harness for e2e scenario 3 | tests | Frontend Lead | M | T38 | todo |
+| T48 | Fix CheckEmailContainer resend (return_to, sign-up fallback, error labeling) | ui | Frontend Lead | M | T38 | todo |
+| T49 | Make SCR-04 "send new link" actually resend | ui | Frontend Lead | S | T38 | todo |
+| T50 | Key memoized DB client by connection string | infra | Backend Lead | S | — | todo |
+| T51 | Add SCR-03 fetch-failure error state to screens.md | docs | Frontend Lead | S | — | todo |
+| T52 | Verify Clerk middleware coverage for /sso-callback + /check-email | wiring | Backend Lead | S | — | todo |
+
+**Total:** 52 tasks (17 original + 20 review-2026-09-03 follow-ups + 15 review-2026-09-03-2 follow-ups); 37 done, 15 todo, ~9 + ~7 + ~6 person-days.
