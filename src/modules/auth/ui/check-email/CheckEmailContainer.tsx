@@ -30,7 +30,7 @@ export function CheckEmailContainer({ email, returnTo, strings }: CheckEmailCont
       return;
     }
     setState("loading");
-    const redirectUrl = `${window.location.origin}/sso-callback?return_to=${encodeURIComponent(returnTo)}&flow=email_link`;
+    const redirectUrl = `${window.location.origin}/sso-callback?return_to=${encodeURIComponent(returnTo)}&flow=email_link&email=${encodeURIComponent(email)}`;
 
     try {
       await signIn.create({ identifier: email, strategy: "email_link", redirectUrl });

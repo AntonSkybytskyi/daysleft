@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { EmailLinkErrorCodeStatus } from "@clerk/nextjs/errors";
 import { SsoCallbackContainer } from "./SsoCallbackContainer";
@@ -10,6 +11,10 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@clerk/nextjs", () => ({
   useClerk: () => ({ handleRedirectCallback: vi.fn(), handleEmailLinkVerification: vi.fn() }),
+}));
+
+vi.mock("@clerk/nextjs/legacy", () => ({
+  useSignIn: () => ({ signIn: { create: vi.fn() } }),
 }));
 
 afterEach(() => {
@@ -126,6 +131,68 @@ describe("SsoCallbackContainer — email-link flow", () => {
     );
 
     await vi.waitFor(() => expect(replace).toHaveBeenCalledWith("/login?error=sign_in_failed"));
+  });
+
+  it("re-sends the magic link (carrying the known email and returnTo) when 'Send a new link' is clicked, instead of navigating to /login", async () => {
+    const handleEmailLinkVerification = vi.fn().mockRejectedValue(emailLinkError(EmailLinkErrorCodeStatus.Expired));
+    const sendMagicLink = vi.fn().mockReturnValue(new Promise(() => {}));
+    render(
+      <SsoCallbackContainer
+        returnTo="/dashboard/trips/1"
+        flow="email_link"
+        email="traveler@example.test"
+        deps={{ handleEmailLinkVerification, sendMagicLink } as never}
+      />,
+    );
+
+    await screen.findByText(/no longer valid/i);
+    await userEvent.click(screen.getByRole("button", { name: /send a new link/i }));
+
+    expect(sendMagicLink).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identifier: "traveler@example.test",
+        redirectUrl: expect.stringContaining(encodeURIComponent("/dashboard/trips/1")),
+      }),
+    );
+    expect(replace).not.toHaveBeenCalledWith("/login");
+  });
+
+  it("shows the loading state while the new link is being sent", async () => {
+    const handleEmailLinkVerification = vi.fn().mockRejectedValue(emailLinkError(EmailLinkErrorCodeStatus.Expired));
+    const sendMagicLink = vi.fn().mockReturnValue(new Promise(() => {}));
+    render(
+      <SsoCallbackContainer
+        returnTo="/dashboard"
+        flow="email_link"
+        email="traveler@example.test"
+        deps={{ handleEmailLinkVerification, sendMagicLink } as never}
+      />,
+    );
+
+    await screen.findByText(/no longer valid/i);
+    await userEvent.click(screen.getByRole("button", { name: /send a new link/i }));
+
+    expect(screen.getByRole("button", { name: /send a new link/i })).toBeDisabled();
+  });
+
+  it("shows error-rate-limited on a real 429 when re-sending the new link", async () => {
+    const handleEmailLinkVerification = vi.fn().mockRejectedValue(emailLinkError(EmailLinkErrorCodeStatus.Expired));
+    const rateLimitError = Object.assign(new Error("too_many_requests"), { status: 429 });
+    Object.defineProperty(rateLimitError, "constructor", { value: { kind: "ClerkAPIResponseError" } });
+    const sendMagicLink = vi.fn().mockRejectedValue(rateLimitError);
+    render(
+      <SsoCallbackContainer
+        returnTo="/dashboard"
+        flow="email_link"
+        email="traveler@example.test"
+        deps={{ handleEmailLinkVerification, sendMagicLink } as never}
+      />,
+    );
+
+    await screen.findByText(/no longer valid/i);
+    await userEvent.click(screen.getByRole("button", { name: /send a new link/i }));
+
+    expect(await screen.findByText(/too many requests/i)).toBeInTheDocument();
   });
 
   it("navigates to returnTo when onVerifiedOnOtherDevice fires", () => {

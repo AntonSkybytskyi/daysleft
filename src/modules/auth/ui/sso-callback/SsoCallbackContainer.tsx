@@ -1,7 +1,8 @@
 "use client";
 
 import { useClerk } from "@clerk/nextjs";
-import { EmailLinkErrorCodeStatus, isEmailLinkError } from "@clerk/nextjs/errors";
+import { useSignIn } from "@clerk/nextjs/legacy";
+import { EmailLinkErrorCodeStatus, isClerkAPIResponseError, isEmailLinkError } from "@clerk/nextjs/errors";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Spinner } from "@/modules/ui/Spinner/Spinner";
@@ -19,11 +20,13 @@ export type SsoCallbackDeps = {
     redirectUrlComplete: string;
     onVerifiedOnOtherDevice?: () => void;
   }) => Promise<unknown>;
+  sendMagicLink: (opts: { identifier: string; redirectUrl: string }) => Promise<unknown>;
 };
 
 export type SsoCallbackContainerProps = {
   returnTo: string;
   flow?: "email_link" | "oauth";
+  email?: string;
   deps?: SsoCallbackDeps;
   strings?: Partial<MagicLinkInvalidScreenStrings>;
 };
@@ -36,10 +39,16 @@ function isInvalidEmailLink(error: unknown): boolean {
   return code === EmailLinkErrorCodeStatus.Expired || code === EmailLinkErrorCodeStatus.Failed;
 }
 
-export function SsoCallbackContainer({ returnTo, flow = "oauth", deps, strings }: SsoCallbackContainerProps) {
+function isRateLimited(error: unknown): boolean {
+  return isClerkAPIResponseError(error as Error) && (error as { status?: number }).status === 429;
+}
+
+export function SsoCallbackContainer({ returnTo, flow = "oauth", email, deps, strings }: SsoCallbackContainerProps) {
   const router = useRouter();
   const clerk = useClerk();
+  const { signIn } = useSignIn();
   const [linkInvalid, setLinkInvalid] = useState(false);
+  const [resendState, setResendState] = useState<"idle" | "loading" | "error-rate-limited">("idle");
 
   useEffect(() => {
     if (flow === "email_link") {
@@ -68,10 +77,26 @@ export function SsoCallbackContainer({ returnTo, flow = "oauth", deps, strings }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const handleSendNewLink = async () => {
+    if (!email || (!deps?.sendMagicLink && !signIn)) {
+      router.replace("/login");
+      return;
+    }
+    setResendState("loading");
+    const sendMagicLink = deps?.sendMagicLink ?? ((opts) => signIn!.create({ ...opts, strategy: "email_link" }));
+    const redirectUrl = `${window.location.origin}/sso-callback?return_to=${encodeURIComponent(returnTo)}&flow=email_link&email=${encodeURIComponent(email)}`;
+
+    try {
+      await sendMagicLink({ identifier: email, redirectUrl });
+      router.replace(`/check-email?email=${encodeURIComponent(email)}&return_to=${encodeURIComponent(returnTo)}`);
+    } catch (error) {
+      setResendState(isRateLimited(error) ? "error-rate-limited" : "idle");
+    }
+  };
+
   if (linkInvalid) {
-    return (
-      <MagicLinkInvalidScreen state="default" onSendNewLink={() => router.replace("/login")} strings={strings} />
-    );
+    const state = resendState === "idle" ? "default" : resendState;
+    return <MagicLinkInvalidScreen state={state} onSendNewLink={handleSendNewLink} strings={strings} />;
   }
 
   return (
