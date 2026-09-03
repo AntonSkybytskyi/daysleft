@@ -194,23 +194,26 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     actor Traveler
-    participant Web UI
+    participant Web UI (originating device)
+    participant Web UI (opening device)
     participant API routes
     participant Clerk
     participant Postgres
 
-    Traveler->>Web UI: requests a magic-link for their email
-    Web UI->>Clerk: sends the magic-link email
+    Traveler->>Web UI (originating device): requests a magic-link for their email
+    Web UI (originating device)->>Clerk: sends the magic-link email, starts polling for completion
     Clerk-->>Traveler: magic-link email
-    Traveler->>Clerk: clicks the link
+    Traveler->>Clerk: clicks the link, on a different device or browser
     alt link expired, already used, or superseded
-        Clerk-->>Web UI: link no longer valid
-        Web UI-->>Traveler: shows link invalid, offers to send a new one
+        Clerk-->>Web UI (opening device): link no longer valid
+        Web UI (opening device)-->>Traveler: shows link invalid, offers to send a new one
     else link valid, opened on a different device or browser
         Clerk->>API routes: webhook — user created or matched by verified email
         API routes->>Postgres: upserts users shadow row
-        Clerk-->>Web UI: session established (on the device that opened the link)
-        Web UI-->>Traveler: shows the dashboard directly, no return to original device
+        Clerk-->>Web UI (originating device): poll observes verified — session established
+        Web UI (originating device)-->>Traveler: shows the dashboard directly, on the originating device
+        Clerk-->>Web UI (opening device): reports verified-on-other-device
+        Web UI (opening device)-->>Traveler: shows "you're signed in on your other device", no resend CTA
     end
 ```
 

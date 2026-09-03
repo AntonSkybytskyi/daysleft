@@ -46,13 +46,15 @@ flowchart TD
     D --> E[SCR-03 Dashboard]
     C -->|yes| E
     B -->|consent declined, or provider unavailable| F[SCR-01 Login - sign-in failed, retry any method]
-    A -->|enter email, request magic-link| G[SCR-02 Check your email]
-    G -->|click link within 15 min, unused, not superseded| E
+    A -->|enter email, request magic-link| G[SCR-02 Check your email - polls for completion]
+    G -->|click link within 15 min, unused, not superseded, same device| E
+    G -->|background poll observes the link verified on another device| E
     G -->|click link expired, already used, or superseded| H[SCR-04 Magic-link invalid]
     H -->|request a new link| G
+    G -.->|link opened on a different device or browser| I[SCR-04 verified-elsewhere - shown on the opening device only]
 ```
 
-Happy path: the Traveler picks Google or GitHub, is redirected to the provider, and on granted consent with a verified email lands on the dashboard — an account is created silently on first use, or they're signed into the existing one. Picking magic-link instead takes them to a check-your-email screen; clicking a valid link within 15 minutes signs them straight into the dashboard. Two branches cover the errors: if the OAuth consent is declined or the provider is unavailable, they land back on login with a failure message and can retry any method (AC-01b); if the magic-link is expired, already used, or was superseded by a newer request, they land on the magic-link-invalid screen and can request a fresh one (AC-02). A link opened on a different device or browser than the one that requested it still completes sign-in straight to the dashboard, with no attempt to return to the original device (AC-02b) — that's the same "click link" edge in this diagram, just from a different browser.
+Happy path: the Traveler picks Google or GitHub, is redirected to the provider, and on granted consent with a verified email lands on the dashboard — an account is created silently on first use, or they're signed into the existing one. Picking magic-link instead takes them to a check-your-email screen; clicking a valid link within 15 minutes signs them straight into the dashboard. Two branches cover the errors: if the OAuth consent is declined or the provider is unavailable, they land back on login with a failure message and can retry any method (AC-01b); if the magic-link is expired, already used, or was superseded by a newer request, they land on the magic-link-invalid screen and can request a fresh one (AC-02). A link opened on a different device or browser than the one that requested it completes sign-in on the **originating device** — the check-your-email screen there is polling in the background and moves itself to the dashboard once Clerk reports the link verified — while the device that opened the link is shown a distinct "you're signed in on your other device" state (node I) with no further action offered (AC-02b).
 
 ### Flow: US-02 — Same account regardless of method
 
@@ -125,7 +127,7 @@ Whichever screen the Traveler reaches — login, check-your-email, dashboard, ma
 | AC-01 | Flow US-01 → happy path (A→B→C→D/E, and A→G→E) | Covers OAuth and magic-link, first-use and repeat |
 | AC-01b | Flow US-01 → B→F branch | OAuth declined/unavailable |
 | AC-02 | Flow US-01 → G→H branch | Expired/used/superseded magic-link |
-| AC-02b | Flow US-01 → G→E branch (cross-device case, described in prose) | Same edge as the happy click, different device |
+| AC-02b | Flow US-01 → G→E branch (background poll, originating device) and G→I branch (opening device's verified-elsewhere state) | Session completes on the originating device; the opening device gets a distinct terminal state |
 | AC-03 | Flow US-02 → B→C→D branch | Account-linking by verified email |
 | AC-03b | Flow US-02 → B→E branch | No verified email from provider |
 | AC-04 | Flow US-03 → A→B→C | Return-to same browser |

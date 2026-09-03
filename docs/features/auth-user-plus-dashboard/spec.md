@@ -105,7 +105,13 @@ Decisions carried from the ideation pass: account-linking by verified email (clo
 
 **Given** a Traveler requests a magic-link on one device and opens it on a different device or browser
 **When** they complete sign-in from the link
-**Then** the system signs them in there and shows them the dashboard directly, without attempting to return them to the original device
+**Then** the system signs them in on the **originating device** (the one that requested the link) and shows the dashboard there, once its background poll observes the completion — while the device that opened the link is shown a truthful "you're signed in on your other device" state, with no CTA that could supersede the completing attempt
+
+Resolved (round 4/5 review): Clerk's email-link verification model reports completion to the
+device that *requested* the link, not the device that opened it — `onVerifiedOnOtherDevice`/
+`ClientMismatch` fire on the opening device precisely when the other device's sign-in already
+succeeded. The originating-device outcome is the one the SDK can actually deliver; round 4 chose
+it over a same-device-only constraint or an unsupported "hand off" redirect.
 
 ### AC-03 (US-02) — domain invariant
 
