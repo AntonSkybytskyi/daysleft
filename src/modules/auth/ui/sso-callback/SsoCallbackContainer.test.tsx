@@ -105,7 +105,7 @@ describe("SsoCallbackContainer — email-link flow", () => {
     expect(await screen.findByText(/no longer valid/i)).toBeInTheDocument();
   });
 
-  it("redirects to /login?error=sign_in_failed on a client_mismatch EmailLinkError, not SCR-04", async () => {
+  it("renders SCR-04 (not a blind redirect) on a client_mismatch EmailLinkError — this device never gets a session", async () => {
     const handleEmailLinkVerification = vi
       .fn()
       .mockRejectedValue(emailLinkError(EmailLinkErrorCodeStatus.ClientMismatch));
@@ -117,7 +117,8 @@ describe("SsoCallbackContainer — email-link flow", () => {
       />,
     );
 
-    await vi.waitFor(() => expect(replace).toHaveBeenCalledWith("/login?error=sign_in_failed"));
+    expect(await screen.findByText(/no longer valid/i)).toBeInTheDocument();
+    expect(replace).not.toHaveBeenCalled();
   });
 
   it("redirects to /login?error=sign_in_failed on a non-EmailLinkError rejection", async () => {
@@ -195,7 +196,7 @@ describe("SsoCallbackContainer — email-link flow", () => {
     expect(await screen.findByText(/too many requests/i)).toBeInTheDocument();
   });
 
-  it("navigates to returnTo when onVerifiedOnOtherDevice fires", () => {
+  it("renders SCR-04 (not a blind redirect to returnTo) when onVerifiedOnOtherDevice fires — per Clerk's own contract this callback means verification happened on ANOTHER device, so this browser has no session of its own", async () => {
     let capturedOpts: { onVerifiedOnOtherDevice?: () => void } = {};
     const handleEmailLinkVerification = vi.fn().mockImplementation((opts) => {
       capturedOpts = opts;
@@ -210,6 +211,8 @@ describe("SsoCallbackContainer — email-link flow", () => {
     );
 
     capturedOpts.onVerifiedOnOtherDevice?.();
-    expect(replace).toHaveBeenCalledWith("/dashboard/trips/1");
+
+    expect(await screen.findByText(/no longer valid/i)).toBeInTheDocument();
+    expect(replace).not.toHaveBeenCalled();
   });
 });

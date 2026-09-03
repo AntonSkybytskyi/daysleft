@@ -36,7 +36,11 @@ function isInvalidEmailLink(error: unknown): boolean {
     return false;
   }
   const code = (error as { code?: string }).code;
-  return code === EmailLinkErrorCodeStatus.Expired || code === EmailLinkErrorCodeStatus.Failed;
+  return (
+    code === EmailLinkErrorCodeStatus.Expired ||
+    code === EmailLinkErrorCodeStatus.Failed ||
+    code === EmailLinkErrorCodeStatus.ClientMismatch
+  );
 }
 
 function isRateLimited(error: unknown): boolean {
@@ -57,7 +61,9 @@ export function SsoCallbackContainer({ returnTo, flow = "oauth", email, deps, st
 
       handleEmailLinkVerification({
         redirectUrlComplete: returnTo,
-        onVerifiedOnOtherDevice: () => router.replace(returnTo),
+        // Fires when Clerk verified this link on a DIFFERENT browser/device than the one running
+        // this callback — this device never gets a session, so it must not navigate to returnTo.
+        onVerifiedOnOtherDevice: () => setLinkInvalid(true),
       }).catch((error) => {
         if (isInvalidEmailLink(error)) {
           setLinkInvalid(true);
