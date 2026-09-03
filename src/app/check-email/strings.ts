@@ -7,6 +7,7 @@ export const stringKeys = [
   "checkEmail.resend",
   "checkEmail.resentConfirmation",
   "checkEmail.errorRateLimited",
+  "checkEmail.errorSignInFailed",
 ] as const;
 
 export function resolveStrings(acceptLanguage: string | null): Partial<CheckEmailScreenStrings> {
@@ -17,5 +18,6 @@ export function resolveStrings(acceptLanguage: string | null): Partial<CheckEmai
     resend: t["checkEmail.resend"],
     resentConfirmation: t["checkEmail.resentConfirmation"],
     errorRateLimited: t["checkEmail.errorRateLimited"],
+    errorSignInFailed: t["checkEmail.errorSignInFailed"],
   };
 }

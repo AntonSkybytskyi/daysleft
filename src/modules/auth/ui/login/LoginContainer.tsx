@@ -51,7 +51,7 @@ export function LoginContainer({ heading, returnTo, initialState, strings }: Log
     const redirectUrl = `${window.location.origin}/sso-callback?return_to=${encodeURIComponent(returnTo)}&flow=email_link`;
     try {
       await signIn.create({ identifier: email, strategy: "email_link", redirectUrl });
-      router.push(`/check-email?email=${encodeURIComponent(email)}`);
+      router.push(`/check-email?email=${encodeURIComponent(email)}&return_to=${encodeURIComponent(returnTo)}`);
       return;
     } catch (error) {
       if (!isFormIdentifierNotFound(error) || !isSignUpLoaded) {
@@ -63,7 +63,7 @@ export function LoginContainer({ heading, returnTo, initialState, strings }: Log
     try {
       await signUp.create({ emailAddress: email });
       await signUp.prepareEmailAddressVerification({ strategy: "email_link", redirectUrl });
-      router.push(`/check-email?email=${encodeURIComponent(email)}`);
+      router.push(`/check-email?email=${encodeURIComponent(email)}&return_to=${encodeURIComponent(returnTo)}`);
     } catch {
       setState("error-sign-in-failed");
     }

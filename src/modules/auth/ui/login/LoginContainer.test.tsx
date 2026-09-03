@@ -45,7 +45,9 @@ describe("LoginContainer — magic-link sign-up fallback", () => {
     expect(prepareEmailAddressVerification).toHaveBeenCalledWith(
       expect.objectContaining({ strategy: "email_link" }),
     );
-    expect(push).toHaveBeenCalledWith(`/check-email?email=${encodeURIComponent("new-traveler@example.test")}`);
+    expect(push).toHaveBeenCalledWith(
+      `/check-email?email=${encodeURIComponent("new-traveler@example.test")}&return_to=${encodeURIComponent("/dashboard")}`,
+    );
   });
 
   it("shows the generic sign-in-failed error for any other sign-in failure", async () => {

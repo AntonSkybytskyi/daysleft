@@ -14,6 +14,7 @@
   "checkEmail.resend": "Resend",
   "checkEmail.resentConfirmation": "Link resent to {email}.",
   "checkEmail.errorRateLimited": "Too many requests. Wait a bit before trying again.",
+  "checkEmail.errorSignInFailed": "Couldn't resend the link. Try again in a moment.",
   "magicLinkInvalid.heading": "This link is no longer valid",
   "magicLinkInvalid.body": "It may have expired, already been used, or been replaced by a newer one.",
   "magicLinkInvalid.sendNewLink": "Send a new link",

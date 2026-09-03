@@ -1,7 +1,12 @@
 import { Alert } from "@/modules/ui/Alert/Alert";
 import { LinkButton } from "@/modules/ui/LinkButton/LinkButton";
 
-export type CheckEmailScreenState = "default" | "loading" | "resent-confirmation" | "error-rate-limited";
+export type CheckEmailScreenState =
+  | "default"
+  | "loading"
+  | "resent-confirmation"
+  | "error-rate-limited"
+  | "error-sign-in-failed";
 
 export type CheckEmailScreenStrings = {
   heading: string;
@@ -9,6 +14,7 @@ export type CheckEmailScreenStrings = {
   resend: string;
   resentConfirmation: string;
   errorRateLimited: string;
+  errorSignInFailed: string;
 };
 
 const defaultStrings: CheckEmailScreenStrings = {
@@ -17,6 +23,7 @@ const defaultStrings: CheckEmailScreenStrings = {
   resend: "Resend",
   resentConfirmation: "Link resent to {email}.",
   errorRateLimited: "Too many requests. Wait a bit before trying again.",
+  errorSignInFailed: "Couldn't resend the link. Try again in a moment.",
 };
 
 export type CheckEmailScreenProps = {
@@ -36,6 +43,7 @@ export function CheckEmailScreen({ state, email, onResend, strings }: CheckEmail
 
       {state === "resent-confirmation" && <Alert variant="success">{withEmail(t.resentConfirmation)}</Alert>}
       {state === "error-rate-limited" && <Alert variant="error">{t.errorRateLimited}</Alert>}
+      {state === "error-sign-in-failed" && <Alert variant="error">{t.errorSignInFailed}</Alert>}
 
       {(state === "default" || state === "loading") && (
         <p className="text-sm text-slate-600">
