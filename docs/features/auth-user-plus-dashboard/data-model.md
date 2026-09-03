@@ -61,6 +61,18 @@ follows sad.md §8's explicit override, backed by ADR-0001. -->
 <!-- No additional indexes: both access patterns are already served by the PK and the UNIQUE
 constraint's automatic Postgres index — no "just in case" index added. -->
 
+## Migration history note
+
+The live `drizzle/0000_panoramic_paladin.*` migration replaced `drizzle/0000_lovely_venom.*` in
+place at slot 0 (same `idx: 0` in `meta/_journal.json`). This is an intentional reset, not a slot
+reuse of a real migration: `0000_lovely_venom` was `scaffold: materialize skeleton`'s smoke-test
+placeholder (`CREATE TABLE _placeholder`), never applied to any environment beyond the scaffold's
+own smoke check, and this feature is the project's first real schema. Replacing it kept the
+migration history free of a meaningless placeholder table rather than appending a second `up`
+migration whose only job would be dropping the first. Every migration from here forward is
+additive — `pnpm db:up` / `pnpm db:down` (see `scripts/migrate-up.ts` / `scripts/migrate-down.ts`)
+apply/revert in order, never rewrite an already-shipped slot.
+
 ## Test fixtures
 
 - `newTestUser(overrides?)` — builds a `users` row with a deterministic UUID v7-shaped fake Clerk id (`user_test_<uuid>`) and `user-<uuid>@example.test` email; accepts overrides for account-linking / duplicate-email test scenarios (AC-03, AC-03b).
