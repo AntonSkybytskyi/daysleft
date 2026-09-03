@@ -19,4 +19,8 @@ export class LinkedIdentitiesRepository {
   async link(identityId: string, canonicalUserId: string): Promise<void> {
     await this.db.insert(linkedIdentities).values({ identityId, canonicalUserId }).onConflictDoNothing();
   }
+
+  async invalidate(identityId: string): Promise<void> {
+    await this.db.delete(linkedIdentities).where(eq(linkedIdentities.identityId, identityId));
+  }
 }

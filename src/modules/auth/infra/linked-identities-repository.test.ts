@@ -46,4 +46,17 @@ describe("LinkedIdentitiesRepository", () => {
 
     expect(await repository.findCanonicalUserId("user_second_identity")).toBe("user_canonical");
   });
+
+  it("invalidate removes a mapping so a later findCanonicalUserId returns null", async () => {
+    await users.upsertById({ id: "user_canonical", email: "traveler@example.test" });
+    await repository.link("user_second_identity", "user_canonical");
+
+    await repository.invalidate("user_second_identity");
+
+    expect(await repository.findCanonicalUserId("user_second_identity")).toBeNull();
+  });
+
+  it("invalidate on an identity with no mapping is a no-op, not an error", async () => {
+    await expect(repository.invalidate("user_never_linked")).resolves.toBeUndefined();
+  });
 });

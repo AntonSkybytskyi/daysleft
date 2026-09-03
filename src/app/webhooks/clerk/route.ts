@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getClerkWebhookSecret } from "@/modules/auth/infra/clerk-client";
 import { createDbClient } from "@/db/client";
 import { UsersRepository } from "@/modules/auth/infra/users-repository";
+import { LinkedIdentitiesRepository } from "@/modules/auth/infra/linked-identities-repository";
 import { createInMemoryDedupeStore, handleClerkWebhook } from "@/modules/auth/infra/routes/clerk-webhook";
 import { mapUnknownError, toErrorEnvelope, type ErrorBody } from "@/lib/errors";
 
@@ -18,10 +19,11 @@ export async function POST(request: NextRequest) {
 
     const db = createDbClient();
     const repository = new UsersRepository(db);
+    const linkedIdentities = new LinkedIdentitiesRepository(db);
 
     const result = await handleClerkWebhook(
       { headers, rawBody },
-      { webhookSecret: getClerkWebhookSecret(), repository, dedupeStore },
+      { webhookSecret: getClerkWebhookSecret(), repository, linkedIdentities, dedupeStore },
     );
 
     const body = result.status === 200 ? result.body : toErrorEnvelope(result.body as ErrorBody);

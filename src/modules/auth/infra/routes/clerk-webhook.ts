@@ -2,6 +2,7 @@ import { resolveAccountLinking } from "@/modules/auth/app/account-linking";
 import { errorBody } from "@/lib/errors";
 import { verifyClerkWebhook, type ClerkWebhookHeaders } from "../verify-webhook";
 import type { UsersRepository } from "../users-repository";
+import type { LinkedIdentitiesRepository } from "../linked-identities-repository";
 
 export type ClerkWebhookRequest = {
   headers: ClerkWebhookHeaders;
@@ -18,6 +19,11 @@ export type ClerkWebhookDeps = {
   repository: UsersRepository;
   verify?: typeof verifyClerkWebhook;
   dedupeStore?: WebhookDedupeStore;
+  // A stored linked_identities row is only a snapshot of the email that justified it at link
+  // time — invalidating it here on any user.created/user.updated for that identity forces the
+  // next interactive session to re-derive the mapping from Clerk's current data, instead of
+  // durably misattributing the identity to a stale canonical account forever.
+  linkedIdentities?: Pick<LinkedIdentitiesRepository, "invalidate">;
 };
 
 export type ClerkWebhookResult = {
@@ -61,6 +67,7 @@ export async function handleClerkWebhook(
   }
 
   const data = event.data;
+  await deps.linkedIdentities?.invalidate(data.id);
   const emailAddresses = Array.isArray(data.email_addresses) ? data.email_addresses : [];
   const verifiedEntry = emailAddresses.find((entry) => entry.verification?.status === "verified");
   const verifiedEmail = verifiedEntry?.email_address ?? null;

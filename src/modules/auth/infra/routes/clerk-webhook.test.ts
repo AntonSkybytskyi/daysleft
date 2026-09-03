@@ -204,6 +204,36 @@ describe("handleClerkWebhook", () => {
     expect(JSON.stringify(second.body)).not.toContain("user_1");
   });
 
+  it("invalidates any stored linked-identity mapping for the event's identity on user.created/user.updated", async () => {
+    const repository = fakeRepository();
+    const linkedIdentities = { invalidate: vi.fn().mockResolvedValue(undefined) };
+    const verify = vi.fn().mockReturnValue({ valid: true, event: JSON.parse(eventPayload({ id: "user_second_identity" })) });
+
+    await handleClerkWebhook(
+      { headers: validHeaders, rawBody: eventPayload({ id: "user_second_identity" }) },
+      { webhookSecret, repository, verify, linkedIdentities: linkedIdentities as never },
+    );
+
+    // A stored mapping is only ever a snapshot of the email that justified it — if the
+    // identity's Clerk profile changed (this event proves it did), the old mapping must not
+    // survive to silently misattribute the identity to whichever account it used to resolve to.
+    expect(linkedIdentities.invalidate).toHaveBeenCalledWith("user_second_identity");
+  });
+
+  it("does not invalidate anything for an ignored non-user event type", async () => {
+    const repository = fakeRepository();
+    const linkedIdentities = { invalidate: vi.fn().mockResolvedValue(undefined) };
+    const payload = JSON.stringify({ type: "session.created", data: { id: "sess_1" } });
+    const verify = vi.fn().mockReturnValue({ valid: true, event: JSON.parse(payload) });
+
+    await handleClerkWebhook(
+      { headers: validHeaders, rawBody: payload },
+      { webhookSecret, repository, verify, linkedIdentities: linkedIdentities as never },
+    );
+
+    expect(linkedIdentities.invalidate).not.toHaveBeenCalled();
+  });
+
   it("bounds the in-memory dedupe store instead of retaining every svix-id for the process lifetime", async () => {
     const dedupeStore = createInMemoryDedupeStore({ maxEntries: 2 });
     dedupeStore.set("a", { status: 200, body: { deduped: true } });
