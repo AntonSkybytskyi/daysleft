@@ -60,4 +60,12 @@
 | T51 | Add SCR-03 fetch-failure error state to screens.md | docs | Frontend Lead | S | — | done |
 | T52 | Verify Clerk middleware coverage for /sso-callback + /check-email | wiring | Backend Lead | S | — | done |
 
-**Total:** 52 tasks (17 original + 20 review-2026-09-03 follow-ups + 15 review-2026-09-03-2 follow-ups); 37 done, 15 todo, ~9 + ~7 + ~6 person-days.
+| T53 | Establish session on second device for magic-link cross-device verify | ui | Frontend Lead | M | — | todo |
+| T54 | Clear client-side Clerk session on logout | app | Frontend Lead | S | — | todo |
+| T55 | Persist linked-identity mapping across instances/restarts | data | Backend Lead | M | — | todo |
+| T56 | Fix openapi.yaml + screens.md drift (round 3) | docs | Backend Lead | S | — | todo |
+| T57 | SCR-04 resend: sign-up fallback + visible failure state | ui | Frontend Lead | S | — | todo |
+| T58 | Distinct error message for failed logout | ui | Frontend Lead | S | — | todo |
+| T59 | migrate-down test exercises the real script | tests | Backend Lead | S | — | todo |
+
+**Total:** 59 tasks (17 original + 20 review-2026-09-03 follow-ups + 15 review-2026-09-03-2 follow-ups + 7 review-2026-09-03-3 follow-ups); 52 done, 7 todo.

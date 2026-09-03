@@ -805,6 +805,101 @@
       "files_hint": [
         "src/middleware.ts"
       ]
+    },
+    {
+      "id": "T53",
+      "title": "Establish a session on the second device when a magic link is verified there",
+      "layer": "ui",
+      "deps": [],
+      "acs": [
+        "AC-02b"
+      ],
+      "dod": "opening a magic link on a different device/browser than the one that requested it signs in and shows the dashboard on that second device (not a redirect back to /login); Clerk's onVerifiedOnOtherDevice and ClientMismatch outcomes are handled per their actual meaning; the regression test asserts a session is established, not just that router.replace was called",
+      "files_hint": [
+        "src/modules/auth/ui/sso-callback/SsoCallbackContainer.tsx",
+        "src/modules/auth/ui/sso-callback/SsoCallbackContainer.test.tsx"
+      ]
+    },
+    {
+      "id": "T54",
+      "title": "Clear the client-side Clerk session on logout",
+      "layer": "app",
+      "deps": [],
+      "acs": [
+        "AC-06"
+      ],
+      "dod": "logout calls Clerk's client signOut() alongside the existing server-side revoke; a return to /dashboard on the same browser is blocked immediately after logout, not only after the session JWT naturally expires; test asserts client session state is cleared",
+      "files_hint": [
+        "src/modules/dashboard/ui/DashboardContainer.tsx"
+      ]
+    },
+    {
+      "id": "T55",
+      "title": "Persist linked-identity mapping so it survives across instances and restarts",
+      "layer": "data",
+      "deps": [],
+      "acs": [
+        "AC-03"
+      ],
+      "dod": "the second Clerk identity's linked-account resolution is stored in the database (schema + migration), not only in the process-local defaultLinkedIdentities Map; the 'linked' banner and its contract guarantee ('shown once') hold across multiple stateless instances per sad.md \u00a77; the unbounded in-memory map is removed or replaced",
+      "files_hint": [
+        "src/modules/auth/app/session.ts",
+        "docs/features/auth-user-plus-dashboard/data-model.md",
+        "docs/features/auth-user-plus-dashboard/migrations/"
+      ]
+    },
+    {
+      "id": "T56",
+      "title": "Fix openapi.yaml and screens.md drift found in review round 3",
+      "layer": "docs",
+      "deps": [],
+      "acs": [
+        "AC-03b"
+      ],
+      "dod": "openapi.yaml's dashboard 401 documents auth.email_conflict with an example; the dashboard 200 example includes the linked field; ClerkWebhookEvent's type enum no longer contradicts the ignored-event example; screens.md adds SCR-01's error-email-conflict row and SCR-02's error-sign-in-failed row",
+      "files_hint": [
+        "docs/features/auth-user-plus-dashboard/contracts/openapi.yaml",
+        "docs/features/auth-user-plus-dashboard/screens.md"
+      ]
+    },
+    {
+      "id": "T57",
+      "title": "Give SCR-04's resend a sign-up fallback and a visible failure state",
+      "layer": "ui",
+      "deps": [],
+      "acs": [
+        "AC-02"
+      ],
+      "dod": "SCR-04's 'send new link' falls back to sign-up creation on form_identifier_not_found, mirroring CheckEmailContainer/LoginContainer; a non-429 resend failure renders a visible error-sign-in-failed state instead of silently reverting to default; screens.md documents the new state",
+      "files_hint": [
+        "src/modules/auth/ui/sso-callback/SsoCallbackContainer.tsx",
+        "src/modules/auth/ui/magic-link-invalid/MagicLinkInvalidScreen.tsx",
+        "docs/features/auth-user-plus-dashboard/screens.md"
+      ]
+    },
+    {
+      "id": "T58",
+      "title": "Give a failed logout its own error message instead of the dashboard-fetch-failed copy",
+      "layer": "ui",
+      "deps": [],
+      "acs": [],
+      "dod": "a 401/500 from the logout endpoint renders a distinct dashboard.errorLogoutFailed message, not errorFetchFailed; existing DashboardContainer tests are updated to assert the correct copy",
+      "files_hint": [
+        "src/modules/dashboard/ui/DashboardContainer.tsx",
+        "src/modules/dashboard/ui/DashboardScreen.tsx"
+      ]
+    },
+    {
+      "id": "T59",
+      "title": "Make the migrate-down test exercise the real script instead of reimplementing its SQL",
+      "layer": "tests",
+      "deps": [],
+      "acs": [],
+      "dod": "tests/integration/migrations/migrate-down.test.ts calls an exported revert step from scripts/migrate-down.ts rather than inlining the DELETE statement; reverting migrate-down.ts's table/key breaks this test",
+      "files_hint": [
+        "scripts/migrate-down.ts",
+        "tests/integration/migrations/migrate-down.test.ts"
+      ]
     }
   ]
 }
