@@ -59,10 +59,25 @@ paths:
                     verification: { status: verified }
       responses:
         "200":
-          description: users row created or updated (sad.md §6 flows 1, 3, 4 — matched by verified email)
+          description: |
+            users row created or updated (sad.md §6 flows 1, 3, 4 — matched by verified email),
+            OR the event type isn't one this webhook acts on (IgnoredEvent), OR this svix-id was
+            already processed and the dedupe cache served a PII-free marker instead of re-reading
+            the (possibly stale) upserted row (DedupedEvent).
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/User" }
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/User"
+                  - $ref: "#/components/schemas/IgnoredEvent"
+                  - $ref: "#/components/schemas/DedupedEvent"
+              examples:
+                upserted:
+                  value: { id: "user_2sZ1example", email: "traveler@example.test" }
+                ignored:
+                  value: { ignored: true, type: "session.created" }
+                deduped:
+                  value: { deduped: true }
         "401":
           description: Svix signature verification failed
           content:
@@ -112,15 +127,26 @@ paths:
             No session, or an expired/invalid one — no account or dashboard data is revealed
             (sad.md §6 flows 6, 7). `details.return_to` carries the originally requested path so
             the client can round-trip it through Clerk's hosted login and land back here (AC-04).
+            `auth.session_invalid` covers no-session/expired/revoked; `auth.email_required`
+            covers a valid Clerk session whose account has no verified email yet (AC-03b).
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
-              example:
-                error:
-                  code: "auth.session_invalid"
-                  message: "Sign in to view your dashboard."
-                  details:
-                    return_to: "/dashboard"
+              examples:
+                sessionInvalid:
+                  value:
+                    error:
+                      code: "auth.session_invalid"
+                      message: "Sign in to view your dashboard."
+                      details:
+                        return_to: "/dashboard"
+                emailRequired:
+                  value:
+                    error:
+                      code: "auth.email_required"
+                      message: "Add or verify an email address with your sign-in provider, then try again."
+                      details:
+                        return_to: "/dashboard"
 
   /api/v1/auth/logout:
     post:
@@ -211,7 +237,7 @@ components:
 
     DashboardData:
       type: object
-      required: [user, has_trips]
+      required: [user, has_trips, linked]
       additionalProperties: false
       properties:
         user: { $ref: "#/components/schemas/UserSummary" }
@@ -220,6 +246,29 @@ components:
           description: >-
             Hardcoded false in this slice (spec §3 non-goal: populated dashboard content is out
             of scope — no trips table exists yet, AC-07). Becomes a real query once `trips` ships.
+        linked:
+          type: boolean
+          description: >-
+            true only on the request where account-linking-by-email actually resolved this
+            session to an existing account (AC-03) — the client shows the "signed in to your
+            existing account" notice once, not on every subsequent load.
+
+    IgnoredEvent:
+      description: A Clerk event type this webhook doesn't act on (only user.created/user.updated are handled).
+      type: object
+      required: [ignored, type]
+      additionalProperties: false
+      properties:
+        ignored: { type: boolean, enum: [true] }
+        type: { type: string }
+
+    DedupedEvent:
+      description: A redelivery of a svix-id already processed — served from the dedupe cache, no PII.
+      type: object
+      required: [deduped]
+      additionalProperties: false
+      properties:
+        deduped: { type: boolean, enum: [true] }
 
     # Shape dictated by Clerk (external system, ADR-0001) — not a data-model.md entity.
     ClerkWebhookEvent:
