@@ -23,7 +23,7 @@ updated_at: "2026-09-02"
 ## Design tool
 
 - **Tool:** code — no Figma/Pencil MCP connected this session; markdown wireframes in each feature's `screens.md` need no tool and never block the pipeline.
-- **Library location:** the in-repo components (`src/modules/ui/`, once established) are the library — no external file.
+- **Library location:** the in-repo components (`src/modules/ui/`) are the library — no external file.
 
 ## Token source
 
@@ -33,18 +33,25 @@ updated_at: "2026-09-02"
 
 ## Component inventory
 
-<!-- empty — greenfield, no UI code yet. `implement` registers components here as the first UI feature builds them. -->
+Established by `auth-user-plus-dashboard` (first UI feature), `src/modules/ui/`:
 
-| Component | Source (`file:line` / node / URL) | States it supports | Notes |
+| Component | Source | States it supports | Notes |
 |---|---|---|---|
-| — | — | — | none yet; first UI feature establishes the initial set in `src/modules/ui/` |
+| `Button` | `src/modules/ui/Button/Button.tsx` | primary, secondary, loading, disabled | generic action button; loading disables the button and shows `Spinner` |
+| `LinkButton` | `src/modules/ui/LinkButton/LinkButton.tsx` | default, loading | text-styled inline action (e.g. "Resend") |
+| `OAuthProviderButton` | `src/modules/ui/OAuthProviderButton/OAuthProviderButton.tsx` | google, github, loading | provider-branded button, full width |
+| `EmailInput` | `src/modules/ui/EmailInput/EmailInput.tsx` | default, error | labeled email field, `aria-invalid` + associated error text |
+| `Alert` | `src/modules/ui/Alert/Alert.tsx` | info (`role=status`), error (`role=alert`) | inline banner |
+| `Spinner` | `src/modules/ui/Spinner/Spinner.tsx` | standalone, embedded | `role=status`; embedding components override the host's `aria-label` so it doesn't leak "Loading" into the button's accessible name |
+| `Header` | `src/modules/ui/Header/Header.tsx` | with/without logout action | app-shell header, composes `Button` |
+| `EmptyState` | `src/modules/ui/EmptyState/EmptyState.tsx` | default | heading + body message |
 
 ## Interaction & writing conventions
 
-<!-- no UI feature built yet — first UI feature (auth-user-plus-dashboard) sets these precedents; refresh this section once it lands. -->
+Set by `auth-user-plus-dashboard` (first UI feature):
 
-- **Errors:** TBD — set by the first UI feature
-- **Empty states:** TBD — set by the first UI feature
-- **Loading:** TBD — set by the first UI feature
-- **Validation:** TBD — set by the first UI feature
-- **Microcopy tone:** TBD — set by the first UI feature
+- **Errors:** `Alert` with `variant="error"` (`role=alert`, assertive); inline field errors via `EmailInput`'s `error` prop (`aria-invalid` + adjacent message)
+- **Empty states:** `EmptyState` — a heading plus a one-line body, no illustration
+- **Loading:** the acting control itself shows `Spinner` and disables (`Button`/`LinkButton`/`OAuthProviderButton`'s `loading` prop) — no full-page spinners for in-place actions
+- **Validation:** inline, on the field itself (`EmailInput`), not deferred to a summary block
+- **Microcopy tone:** direct and short (e.g. "Sign-in didn't complete. Try again with any method below."); see `src/lib/i18n/en.json` for the extracted strings
