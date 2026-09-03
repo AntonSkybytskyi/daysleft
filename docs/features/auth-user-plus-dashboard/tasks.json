@@ -1138,6 +1138,97 @@
         "src/modules/auth/infra/routes/clerk-webhook.ts",
         "src/app/webhooks/clerk/route.ts"
       ]
+    },
+    {
+      "id": "T74",
+      "title": "Stop T66's guard from firing a false error on the sign-up fallback path into /check-email",
+      "layer": "ui",
+      "deps": [
+        "T66"
+      ],
+      "acs": [
+        "AC-01",
+        "AC-02b"
+      ],
+      "dod": "a magic-link sign-up (LoginContainer's form_identifier_not_found fallback, and the identical SsoCallbackContainer path) marks the arrival at /check-email so the mount-time poll guard skips and the screen stays on the truthful default state instead of rendering error-sign-in-failed; the error-sign-in-failed state (SCR-02) renders the Alert + Resend LinkButton screens.md specifies instead of a dead end; a test drives the real Login/SsoCallback sign-up fallback through to the rendered CheckEmail screen and asserts the default (not error) state",
+      "files_hint": [
+        "src/app/check-email/page.tsx",
+        "src/modules/auth/ui/check-email/CheckEmailContainer.tsx",
+        "src/modules/auth/ui/check-email/CheckEmailContainer.test.tsx",
+        "src/modules/auth/ui/check-email/CheckEmailScreen.tsx",
+        "src/modules/auth/ui/login/LoginContainer.tsx",
+        "src/modules/auth/ui/sso-callback/SsoCallbackContainer.tsx"
+      ]
+    },
+    {
+      "id": "T75",
+      "title": "Close AC-02b's sign-up sub-branch gap in the artifact trio and give the sign-in dead end a CTA",
+      "layer": "docs",
+      "deps": [
+        "T65",
+        "T67"
+      ],
+      "acs": [
+        "AC-02b"
+      ],
+      "dod": "sad.md flow 3 and ux-flows.md's US-01 chart/AC-02b row describe both opening-device outcomes T66/T67 shipped (verified-elsewhere and verified-elsewhere-unconfirmed), not only the sign-in case; spec.md's AC-02b Then is qualified to the sign-in scenario it actually describes; the sign-in branch's verified-elsewhere screen gets the same non-destructive onBackToLogin CTA T67 gave the sign-up branch, and no longer unconditionally asserts a session is established when Clerk's ClientMismatch can fire on stale client identity alone",
+      "files_hint": [
+        "docs/features/auth-user-plus-dashboard/sad.md",
+        "docs/features/auth-user-plus-dashboard/ux-flows.md",
+        "docs/features/auth-user-plus-dashboard/spec.md",
+        "src/modules/auth/ui/magic-link-invalid/MagicLinkInvalidScreen.tsx",
+        "src/modules/auth/ui/sso-callback/SsoCallbackContainer.tsx"
+      ]
+    },
+    {
+      "id": "T76",
+      "title": "Give T71's logout retry real backoff and a genuine force-clear on exhaustion",
+      "layer": "app",
+      "deps": [
+        "T71"
+      ],
+      "acs": [
+        "AC-06"
+      ],
+      "dod": "the client-side signOut retry has a short backoff between attempts instead of firing back-to-back (so a transient blip has a real chance to clear within the retry window); on exhaustion the app force-clears the client session (or surfaces an explicit error-logout-failed state) instead of redirecting with a possibly-live client session; test asserts the exact retry count (toHaveBeenCalledTimes, not a loose > 1 bound) and that no usable session remains after exhaustion",
+      "files_hint": [
+        "src/modules/dashboard/ui/DashboardContainer.tsx",
+        "src/modules/dashboard/ui/DashboardContainer.test.tsx"
+      ]
+    },
+    {
+      "id": "T77",
+      "title": "Don't invalidate linked-identity mappings on a webhook event carrying no verified email",
+      "layer": "data",
+      "deps": [
+        "T68"
+      ],
+      "acs": [
+        "AC-03"
+      ],
+      "dod": "clerk-webhook's ownEmailChanged/noLongerMatchesCanonical invalidation block is gated on verifiedEmail !== null — an event with no verified email address is not evidence the email changed, so it must not wipe linked-identity mappings before the 422 auth.email_required rejection; a webhook test with an existing ownRecord and a payload with no verified email asserts invalidate is NOT called",
+      "files_hint": [
+        "src/modules/auth/infra/routes/clerk-webhook.ts",
+        "src/modules/auth/infra/routes/clerk-webhook.test.ts"
+      ]
+    },
+    {
+      "id": "T78",
+      "title": "Guard /check-email against a superseding remount resend and an unmount-during-resend race",
+      "layer": "ui",
+      "deps": [
+        "T69"
+      ],
+      "acs": [
+        "AC-01",
+        "AC-02"
+      ],
+      "dod": "the mount effect checks the installed @clerk/shared signIn.firstFactorVerification.status/expireAt before calling startEmailLinkFlow again on a refresh/back-nav, so a remount with an outstanding unverified link does not send a fresh superseding one (a deliberate user-initiated resend still re-prepares); a mountedRef guard (or equivalent) makes handleResend's continuation and the pollForCompletion it starts no-op after unmount, so a resend in flight when the component unmounts cannot navigate a torn-down page; spec.md's open question at the T69 send-rate NFR is corrected to reflect the real signal instead of \"no verifiable client-side signal\"",
+      "files_hint": [
+        "src/modules/auth/ui/check-email/CheckEmailContainer.tsx",
+        "src/modules/auth/ui/check-email/CheckEmailContainer.test.tsx",
+        "docs/features/auth-user-plus-dashboard/spec.md"
+      ]
     }
   ]
 }
