@@ -13,4 +13,9 @@ describe("Alert", () => {
     render(<Alert variant="error">{message}</Alert>);
     expect(screen.getByRole("alert")).toHaveTextContent(message);
   });
+
+  it("renders success-variant content with a status role", () => {
+    render(<Alert variant="success">Link resent.</Alert>);
+    expect(screen.getByRole("status")).toHaveTextContent("Link resent.");
+  });
 });
