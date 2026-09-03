@@ -18,13 +18,19 @@ erDiagram
         timestamptz created_at
         timestamptz updated_at
     }
+    linked_identities {
+        text identity_id PK
+        text canonical_user_id FK
+        timestamptz created_at
+    }
+    users ||--o{ linked_identities : "canonical_user_id"
 ```
 
-<!-- Single entity, no FKs in this slice. Clerk is the system of record for sessions and
-magic-links (sad.md §4 ADR-0001) — no local session/magic-link table. Dashboard ships as an
-empty-state shell (spec §3 non-goal) — no dashboard-owned data yet. i18n is a static message
-catalog file (src/lib/i18n/en.json), not a DB table (sad.md §5/§8). Future features (trips, rules)
-will FK to users(id) — out of this slice's scope. -->
+<!-- Two entities. Clerk is the system of record for sessions and magic-links (sad.md §4
+ADR-0001) — no local session/magic-link table. Dashboard ships as an empty-state shell (spec §3
+non-goal) — no dashboard-owned data yet. i18n is a static message catalog file
+(src/lib/i18n/en.json), not a DB table (sad.md §5/§8). Future features (trips, rules) will FK to
+users(id) — out of this slice's scope. -->
 
 ## Entities
 
@@ -51,12 +57,32 @@ The local shadow of a Clerk account, kept in sync by the Clerk webhook (sad.md �
 convention exists yet to detect from (greenfield, no code). PK type is NOT a fresh choice here: it
 follows sad.md §8's explicit override, backed by ADR-0001. -->
 
+### `linked_identities`
+
+Maps a second Clerk identity that account-linking-by-email resolved onto the canonical `users`
+row it resolved to (added in review round 3, T55 — replaces a process-local `Map` that didn't
+survive across the horizontally-scaled instances sad.md §7 describes).
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| `identity_id` | TEXT | PK | The second Clerk identity's own user id — never gets its own `users` row since `users.email` is UNIQUE |
+| `canonical_user_id` | TEXT | NOT NULL, FK → `users(id)` | The existing account this identity resolved to (spec §5 AC-03) |
+| `created_at` | TIMESTAMPTZ | NOT NULL DEFAULT now() | When the linking was first resolved |
+
+**Access patterns:**
+- `getSessionUser` looks up `identity_id = <Clerk id>` before re-hitting Clerk's API (sad.md §6
+  flows 1/3/4's "linked" branch) → served by the PK.
+
+**Constraints:** FK on `canonical_user_id` → `users(id)`; no cascade (a canonical user row is
+never deleted in this slice).
+
 ## Indexes
 
 | Index | Columns | Query it serves |
 |---|---|---|
 | `users_pkey` (implicit, PK) | `id` | Webhook upsert by Clerk user id (sad.md §6 flows 1/3/4); future FK joins from `trips`/`rules` |
 | `users_email_key` (implicit, UNIQUE) | `email` | Account-linking match / duplicate-account monitor (spec §5 AC-03, §7); §11 create-or-fetch fallback lookup |
+| `linked_identities_pkey` (implicit, PK) | `identity_id` | `getSessionUser`'s linked-identity lookup (AC-03), durable across instances |
 
 <!-- No additional indexes: both access patterns are already served by the PK and the UNIQUE
 constraint's automatic Postgres index — no "just in case" index added. -->

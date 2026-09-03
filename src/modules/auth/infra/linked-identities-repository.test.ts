@@ -1,0 +1,49 @@
+import { PGlite } from "@electric-sql/pglite";
+import { drizzle } from "drizzle-orm/pglite";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import * as schema from "@/db/schema";
+import { LinkedIdentitiesRepository } from "./linked-identities-repository";
+import { UsersRepository } from "./users-repository";
+
+let client: PGlite;
+let repository: LinkedIdentitiesRepository;
+let users: UsersRepository;
+
+beforeEach(async () => {
+  client = new PGlite();
+  const db = drizzle(client, { schema });
+  for (const file of ["0000_panoramic_paladin.sql", "0001_add_linked_identities.sql"]) {
+    const migrationSql = readFileSync(path.resolve(__dirname, "../../../../drizzle", file), "utf-8");
+    await client.exec(migrationSql);
+  }
+  repository = new LinkedIdentitiesRepository(db);
+  users = new UsersRepository(db);
+});
+
+afterEach(async () => {
+  await client.close();
+});
+
+describe("LinkedIdentitiesRepository", () => {
+  it("findCanonicalUserId returns null when no mapping exists", async () => {
+    expect(await repository.findCanonicalUserId("user_no_mapping")).toBeNull();
+  });
+
+  it("link then findCanonicalUserId returns the canonical id, durably (a fresh repository instance still sees it)", async () => {
+    await users.upsertById({ id: "user_canonical", email: "traveler@example.test" });
+    await repository.link("user_second_identity", "user_canonical");
+
+    const freshRepository = new LinkedIdentitiesRepository(drizzle(client, { schema }));
+    expect(await freshRepository.findCanonicalUserId("user_second_identity")).toBe("user_canonical");
+  });
+
+  it("link is idempotent for a repeat call with the same identity", async () => {
+    await users.upsertById({ id: "user_canonical", email: "traveler@example.test" });
+    await repository.link("user_second_identity", "user_canonical");
+    await repository.link("user_second_identity", "user_canonical");
+
+    expect(await repository.findCanonicalUserId("user_second_identity")).toBe("user_canonical");
+  });
+});

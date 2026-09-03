@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { getClerkClient } from "./clerk-client";
+import { LinkedIdentitiesRepository } from "./linked-identities-repository";
 import { UsersRepository } from "./users-repository";
 import type { Db } from "@/db/client";
 import type { SessionDeps } from "../app/session";
@@ -11,6 +12,7 @@ export function buildSessionDeps(db: Db): SessionDeps {
       return userId;
     },
     repository: new UsersRepository(db),
+    linkedIdentities: new LinkedIdentitiesRepository(db),
     fetchClerkUser: async (userId: string) => {
       const client = getClerkClient();
       const clerkUser = await client.users.getUser(userId);

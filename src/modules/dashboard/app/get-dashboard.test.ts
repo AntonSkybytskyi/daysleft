@@ -14,6 +14,7 @@ describe("getDashboard", () => {
           updatedAt: new Date(),
         }),
       } as never,
+      linkedIdentities: { findCanonicalUserId: vi.fn().mockResolvedValue(null), link: vi.fn() } as never,
       fetchClerkUser: vi.fn(),
     };
 
@@ -29,6 +30,7 @@ describe("getDashboard", () => {
     const sessionDeps: SessionDeps = {
       getAuthUserId: vi.fn().mockResolvedValue(null),
       repository: { findById: vi.fn() } as never,
+      linkedIdentities: { findCanonicalUserId: vi.fn().mockResolvedValue(null), link: vi.fn() } as never,
       fetchClerkUser: vi.fn(),
     };
 
@@ -48,6 +50,7 @@ describe("getDashboard", () => {
     const sessionDeps: SessionDeps = {
       getAuthUserId: vi.fn().mockResolvedValue(null),
       repository: { findById: vi.fn() } as never,
+      linkedIdentities: { findCanonicalUserId: vi.fn().mockResolvedValue(null), link: vi.fn() } as never,
       fetchClerkUser: vi.fn(),
     };
 
@@ -71,6 +74,7 @@ describe("getDashboard", () => {
         findByEmail: vi.fn().mockResolvedValue(null),
         upsertById: vi.fn().mockResolvedValue({ kind: "email_conflict" }),
       } as never,
+      linkedIdentities: { findCanonicalUserId: vi.fn().mockResolvedValue(null), link: vi.fn() } as never,
       fetchClerkUser: vi.fn().mockResolvedValue({ id: "user_new_identity", verifiedEmail: "traveler@example.test" }),
     };
 
@@ -90,6 +94,7 @@ describe("getDashboard", () => {
     const sessionDeps: SessionDeps = {
       getAuthUserId: vi.fn().mockResolvedValue("user_1"),
       repository: { findById: vi.fn().mockResolvedValue(null) } as never,
+      linkedIdentities: { findCanonicalUserId: vi.fn().mockResolvedValue(null), link: vi.fn() } as never,
       fetchClerkUser: vi.fn().mockResolvedValue({ id: "user_1", verifiedEmail: null }),
     };
 

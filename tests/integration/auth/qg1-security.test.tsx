@@ -99,6 +99,7 @@ describe("QG-1 security scenarios (sad.md §10)", () => {
     const sessionDeps: SessionDeps = {
       getAuthUserId: async () => (sessionActive ? "user_1" : null),
       repository,
+      linkedIdentities: { findCanonicalUserId: vi.fn().mockResolvedValue(null), link: vi.fn() } as never,
       fetchClerkUser: vi.fn(),
     };
 

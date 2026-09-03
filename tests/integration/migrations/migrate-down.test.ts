@@ -1,9 +1,30 @@
 import { PGlite } from "@electric-sql/pglite";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { resolveRevertTarget } from "../../../scripts/migrate-down";
 
 const migrationsDir = path.resolve(__dirname, "../../../drizzle");
+
+type JournalEntry = { tag: string; when: number };
+
+function journalEntries(): JournalEntry[] {
+  const journal = JSON.parse(readFileSync(path.resolve(migrationsDir, "meta", "_journal.json"), "utf-8")) as {
+    entries: JournalEntry[];
+  };
+  return journal.entries;
+}
+
+// The table the *last* migration's own up.sql creates (and its down.sql drops) — read from the
+// down SQL rather than hardcoded, so this test doesn't need updating every time a migration is
+// added on top.
+function droppedTableName(downSql: string): string {
+  const match = downSql.match(/DROP TABLE IF EXISTS "([^"]+)"/i);
+  if (!match) {
+    throw new Error(`couldn't find a dropped table name in: ${downSql}`);
+  }
+  return match[1];
+}
 
 let client: PGlite;
 
@@ -41,48 +62,53 @@ async function journalRowCount(): Promise<number> {
 
 describe("migrate-down round trip (up -> down -> up)", () => {
   it("resolveRevertTarget finds this repo's last migration's down.sql and its journal `when`", () => {
+    const entries = journalEntries();
     const target = resolveRevertTarget(migrationsDir);
 
     expect(target).not.toBeNull();
-    expect(target?.tag).toBe("0000_panoramic_paladin");
+    expect(target?.tag).toBe(entries.at(-1)?.tag);
     expect(target?.downSql).toContain("DROP TABLE");
-    expect(typeof target?.journalWhen).toBe("number");
+    expect(target?.journalWhen).toBe(entries.at(-1)?.when);
   });
 
-  it("db:down actually removes the journal row (not a silent no-op), so a subsequent db:up re-applies and restores the users table", async () => {
+  it("db:down actually removes the journal row (not a silent no-op), so a subsequent db:up re-applies and restores the last migration's table", async () => {
     const target = resolveRevertTarget(migrationsDir);
     if (!target) {
       throw new Error("expected a revert target for this repo's real migrations");
     }
-    const upSql = await import("node:fs").then((fs) =>
-      fs.readFileSync(path.resolve(migrationsDir, `${target.tag}.sql`), "utf-8"),
-    );
+    const table = droppedTableName(target.downSql);
 
-    // --- up ---
-    await client.exec(upSql);
-    await client.query(`INSERT INTO "drizzle"."__drizzle_migrations" (hash, created_at) VALUES ($1, $2)`, [
-      "fake-hash-for-test",
-      target.journalWhen,
-    ]);
-    expect(await tableExists("users")).toBe(true);
-    expect(await journalRowCount()).toBe(1);
+    // Apply every migration in journal order — including earlier ones the last migration's own
+    // up.sql may depend on (e.g. an FK to a table an earlier migration created) — recording each
+    // journal row exactly as drizzle-orm's migrate() does.
+    for (const entry of journalEntries()) {
+      const upSql = readFileSync(path.resolve(migrationsDir, `${entry.tag}.sql`), "utf-8");
+      await client.exec(upSql);
+      await client.query(`INSERT INTO "drizzle"."__drizzle_migrations" (hash, created_at) VALUES ($1, $2)`, [
+        "fake-hash-for-test",
+        entry.when,
+      ]);
+    }
+    expect(await tableExists(table)).toBe(true);
+    const rowCountAfterUp = await journalRowCount();
 
     // --- down (this is the fix under test: the real bug left the journal row in place) ---
     await client.exec(target.downSql);
     await client.query(`DELETE FROM "drizzle"."__drizzle_migrations" WHERE created_at = $1`, [target.journalWhen]);
 
-    expect(await tableExists("users")).toBe(false);
-    expect(await journalRowCount()).toBe(0);
+    expect(await tableExists(table)).toBe(false);
+    expect(await journalRowCount()).toBe(rowCountAfterUp - 1);
 
     // --- up again: mirrors drizzle-orm's own re-apply condition (pg-core/dialect.js) —
     // `!lastDbMigration || Number(lastDbMigration.created_at) < migration.folderMillis` — which
     // is only true once the journal row is actually gone.
-    await client.exec(upSql);
+    const lastUpSql = readFileSync(path.resolve(migrationsDir, `${target.tag}.sql`), "utf-8");
+    await client.exec(lastUpSql);
     await client.query(`INSERT INTO "drizzle"."__drizzle_migrations" (hash, created_at) VALUES ($1, $2)`, [
       "fake-hash-for-test",
       target.journalWhen,
     ]);
 
-    expect(await tableExists("users")).toBe(true);
+    expect(await tableExists(table)).toBe(true);
   });
 });
