@@ -7,11 +7,17 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace }),
 }));
 
+const signOut = vi.fn().mockResolvedValue(undefined);
+vi.mock("@clerk/nextjs", () => ({
+  useClerk: () => ({ signOut }),
+}));
+
 import { DashboardContainer } from "./DashboardContainer";
 
 afterEach(() => {
   vi.unstubAllGlobals();
   replace.mockClear();
+  signOut.mockClear();
 });
 
 describe("DashboardContainer", () => {
@@ -89,6 +95,38 @@ describe("DashboardContainer", () => {
 
     expect(fetchMock).toHaveBeenCalledWith("/api/v1/auth/logout", { method: "POST" });
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/login"));
+    expect(signOut).toHaveBeenCalled();
+  });
+
+  it("clears the client-side Clerk session on logout, not only the server-side one", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ status: 200, json: async () => ({ user: { id: "u1", email: "a@b.com" }, has_trips: false }) })
+      .mockResolvedValueOnce({ status: 204 });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<DashboardContainer />);
+    await waitFor(() => expect(screen.getByText(/nothing tracked yet/i)).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole("button", { name: "Log out" }));
+
+    await waitFor(() => expect(signOut).toHaveBeenCalledTimes(1));
+  });
+
+  it("does not clear the client-side Clerk session when the server didn't actually revoke it", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ status: 200, json: async () => ({ user: { id: "u1", email: "a@b.com" }, has_trips: false }) })
+      .mockResolvedValueOnce({ status: 500 });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<DashboardContainer />);
+    await waitFor(() => expect(screen.getByText(/nothing tracked yet/i)).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole("button", { name: "Log out" }));
+
+    await screen.findByRole("alert");
+    expect(signOut).not.toHaveBeenCalled();
   });
 
   it("shows an error instead of redirecting when the logout request fails server-side (no client-side-only logout)", async () => {

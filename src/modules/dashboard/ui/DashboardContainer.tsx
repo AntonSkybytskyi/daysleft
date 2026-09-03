@@ -1,5 +1,6 @@
 "use client";
 
+import { useClerk } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { DashboardScreen, type DashboardScreenStrings } from "./DashboardScreen";
@@ -10,6 +11,7 @@ export type DashboardContainerProps = {
 
 export function DashboardContainer({ strings }: DashboardContainerProps = {}) {
   const router = useRouter();
+  const clerk = useClerk();
   const [status, setStatus] = useState<"loading" | "default" | "error">("loading");
   const [linked, setLinked] = useState(false);
 
@@ -60,6 +62,7 @@ export function DashboardContainer({ strings }: DashboardContainerProps = {}) {
         setStatus("error");
         return;
       }
+      await clerk.signOut();
       router.replace("/login");
     } catch {
       setStatus("error");
