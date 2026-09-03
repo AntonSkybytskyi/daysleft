@@ -9,9 +9,21 @@ const signUpPrepareEmailAddressVerification = vi.fn();
 const setActive = vi.fn();
 const replace = vi.fn();
 
-// A plain, non-pollable signIn — matches most tests, which aren't exercising the mount-time
-// poll. Reassigned per test by the mount-time-poll describe block below.
-let signInValue: Record<string, unknown> = { create: signInCreate };
+// A pollable signIn whose poll never settles — matches the realistic default shape (a
+// signIn.create({ identifier }) attempt normally supports email_link), for tests that aren't
+// exercising the poll's outcome. Reassigned per test by the describe blocks below.
+function pendingPoll() {
+  return { startEmailLinkFlow: vi.fn().mockReturnValue(new Promise(() => {})), cancelEmailLinkFlow: vi.fn() };
+}
+function defaultPollableSignIn(): Record<string, unknown> {
+  return {
+    create: signInCreate,
+    status: "needs_first_factor",
+    supportedFirstFactors: [{ strategy: "email_link", emailAddressId: "idn_default" }],
+    createEmailLinkFlow: () => pendingPoll(),
+  };
+}
+let signInValue: Record<string, unknown> = defaultPollableSignIn();
 
 vi.mock("@clerk/nextjs/legacy", () => ({
   useSignIn: () => ({
@@ -49,7 +61,7 @@ describe("CheckEmailContainer", () => {
     signUpPrepareEmailAddressVerification.mockReset();
     setActive.mockReset();
     replace.mockReset();
-    signInValue = { create: signInCreate };
+    signInValue = defaultPollableSignIn();
   });
 
   it("resends the magic link and shows the confirmation", async () => {
@@ -118,8 +130,10 @@ describe("CheckEmailContainer", () => {
       expect(replace).toHaveBeenCalledWith("/dashboard/trips/123");
     });
 
-    it("shows a visible error instead of waiting forever when the polled attempt doesn't complete", async () => {
-      const startEmailLinkFlow = vi.fn().mockResolvedValue({ status: "expired" });
+    it("shows a visible error instead of waiting forever when the polled attempt expires (real SDK: firstFactorVerification.status, not signIn.status)", async () => {
+      const startEmailLinkFlow = vi
+        .fn()
+        .mockResolvedValue({ status: "needs_first_factor", firstFactorVerification: { status: "expired" } });
       signInValue = {
         create: signInCreate,
         status: "needs_first_factor",
@@ -148,11 +162,81 @@ describe("CheckEmailContainer", () => {
       expect(cancelEmailLinkFlow).toHaveBeenCalled();
     });
 
-    it("does not poll when there is no pending sign-in attempt (e.g. this screen's mock doesn't support it)", () => {
-      render(<CheckEmailContainer email="traveler@example.test" returnTo="/dashboard" />);
+    it("ignores a poll settlement that arrives after the component has already unmounted", async () => {
+      let resolveIt: (value: { status: string; createdSessionId: string }) => void = () => {};
+      const pending = new Promise<{ status: string; createdSessionId: string }>((resolve) => {
+        resolveIt = resolve;
+      });
+      signInValue = {
+        create: signInCreate,
+        status: "needs_first_factor",
+        supportedFirstFactors: [{ strategy: "email_link", emailAddressId: "idn_1" }],
+        createEmailLinkFlow: () => ({ startEmailLinkFlow: () => pending, cancelEmailLinkFlow: vi.fn() }),
+      };
+
+      const { unmount } = render(<CheckEmailContainer email="traveler@example.test" returnTo="/dashboard" />);
+      unmount();
+      resolveIt({ status: "complete", createdSessionId: "sess_1" });
+      await Promise.resolve();
+      await Promise.resolve();
 
       expect(setActive).not.toHaveBeenCalled();
       expect(replace).not.toHaveBeenCalled();
+    });
+
+    it("does not let a resend-cancelled poll's stale settlement clobber the resend's own state", async () => {
+      let resolveStale: (value: { status: string }) => void = () => {};
+      const stale = new Promise<{ status: string }>((resolve) => {
+        resolveStale = resolve;
+      });
+      let createCalls = 0;
+      signInValue = {
+        create: signInCreate,
+        status: "needs_first_factor",
+        supportedFirstFactors: [{ strategy: "email_link", emailAddressId: "idn_1" }],
+        createEmailLinkFlow: () => {
+          createCalls += 1;
+          return createCalls === 1
+            ? { startEmailLinkFlow: () => stale, cancelEmailLinkFlow: vi.fn() }
+            : { startEmailLinkFlow: vi.fn().mockReturnValue(new Promise(() => {})), cancelEmailLinkFlow: vi.fn() };
+        },
+      };
+      signInCreate.mockResolvedValue({});
+
+      render(<CheckEmailContainer email="traveler@example.test" returnTo="/dashboard/trips/123" />);
+      await userEvent.click(screen.getByRole("button", { name: "Resend" }));
+      expect(await screen.findByText(/link resent/i)).toBeInTheDocument();
+
+      // The first (mount-time) poll — cancelled by the resend — settles late with a failure.
+      // It must not overwrite the resend's "Link resent" confirmation.
+      resolveStale({ status: "expired" });
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(screen.getByText(/link resent/i)).toBeInTheDocument();
+    });
+
+    it("shows a visible error, not a silent 'link sent' claim, when the attempt has no createEmailLinkFlow support", () => {
+      signInValue = { create: signInCreate, status: "needs_first_factor" };
+
+      render(<CheckEmailContainer email="traveler@example.test" returnTo="/dashboard" />);
+
+      expect(screen.getByRole("alert")).toBeInTheDocument();
+      expect(setActive).not.toHaveBeenCalled();
+      expect(replace).not.toHaveBeenCalled();
+    });
+
+    it("shows a visible error, not a silent 'link sent' claim, when the attempt has no email_link first factor", () => {
+      signInValue = {
+        create: signInCreate,
+        status: "needs_first_factor",
+        supportedFirstFactors: [{ strategy: "oauth_google" }],
+        createEmailLinkFlow: () => ({ startEmailLinkFlow: vi.fn(), cancelEmailLinkFlow: vi.fn() }),
+      };
+
+      render(<CheckEmailContainer email="traveler@example.test" returnTo="/dashboard" />);
+
+      expect(screen.getByRole("alert")).toBeInTheDocument();
     });
   });
 });

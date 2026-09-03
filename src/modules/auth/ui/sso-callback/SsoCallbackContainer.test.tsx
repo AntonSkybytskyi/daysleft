@@ -13,13 +13,15 @@ vi.mock("@clerk/nextjs", () => ({
   useClerk: () => ({ handleRedirectCallback: vi.fn(), handleEmailLinkVerification: vi.fn() }),
 }));
 
+const signInCreate = vi.fn();
 vi.mock("@clerk/nextjs/legacy", () => ({
-  useSignIn: () => ({ signIn: { create: vi.fn() } }),
+  useSignIn: () => ({ signIn: { create: signInCreate } }),
   useSignUp: () => ({ signUp: undefined }),
 }));
 
 afterEach(() => {
   replace.mockClear();
+  signInCreate.mockReset();
 });
 
 function emailLinkError(code: string): Error {
@@ -159,6 +161,27 @@ describe("SsoCallbackContainer — email-link flow", () => {
       }),
     );
     expect(replace).not.toHaveBeenCalledWith("/login");
+  });
+
+  it("resolves the identifier only, exactly once, without a strategy, when no deps.sendMagicLink override is given (the real default path)", async () => {
+    const handleEmailLinkVerification = vi.fn().mockRejectedValue(emailLinkError(EmailLinkErrorCodeStatus.Expired));
+    signInCreate.mockResolvedValue({});
+    render(
+      <SsoCallbackContainer
+        returnTo="/dashboard/trips/1"
+        flow="email_link"
+        email="traveler@example.test"
+        deps={{ handleEmailLinkVerification } as never}
+      />,
+    );
+
+    await screen.findByText(/no longer valid/i);
+    await userEvent.click(screen.getByRole("button", { name: /send a new link/i }));
+
+    // Reverting to a strategy: "email_link" send here would fire a second, redundant email
+    // alongside /check-email's own send — this pins the single-call, no-strategy shape.
+    expect(signInCreate).toHaveBeenCalledTimes(1);
+    expect(signInCreate).toHaveBeenCalledWith({ identifier: "traveler@example.test" });
   });
 
   it("shows the loading state while the new link is being sent", async () => {

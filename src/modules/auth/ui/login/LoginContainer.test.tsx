@@ -50,6 +50,23 @@ describe("LoginContainer — magic-link sign-up fallback", () => {
     );
   });
 
+  it("resolves the identifier only, exactly once, without a strategy — the actual send happens on /check-email", async () => {
+    signInCreate.mockResolvedValue({});
+
+    render(<LoginContainer {...baseProps()} />);
+    await userEvent.type(screen.getByLabelText("Email"), "traveler@example.test");
+    await userEvent.click(screen.getByRole("button", { name: "Send magic link" }));
+
+    // Reverting to signIn.create({ identifier, strategy: "email_link", redirectUrl }) would
+    // fire a second, redundant email alongside /check-email's own send — this pins the
+    // single-call, no-strategy shape so that regression can't creep back in silently.
+    expect(signInCreate).toHaveBeenCalledTimes(1);
+    expect(signInCreate).toHaveBeenCalledWith({ identifier: "traveler@example.test" });
+    expect(push).toHaveBeenCalledWith(
+      `/check-email?email=${encodeURIComponent("traveler@example.test")}&return_to=${encodeURIComponent("/dashboard")}`,
+    );
+  });
+
   it("shows the generic sign-in-failed error for any other sign-in failure", async () => {
     signInCreate.mockRejectedValue({ errors: [{ code: "form_password_incorrect" }] });
 
