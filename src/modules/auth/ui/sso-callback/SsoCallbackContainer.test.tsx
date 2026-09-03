@@ -33,4 +33,19 @@ describe("SsoCallbackContainer", () => {
 
     await vi.waitFor(() => expect(replace).toHaveBeenCalledWith("/login?error=sign_in_failed"));
   });
+
+  it("renders SCR-04 (magic-link-invalid) when the callback reports an expired link, instead of redirecting", async () => {
+    const handleRedirectCallback = vi.fn().mockRejectedValue({ errors: [{ code: "verification_expired" }] });
+    render(<SsoCallbackContainer returnTo="/dashboard" deps={{ handleRedirectCallback }} />);
+
+    expect(await screen.findByText(/no longer valid/i)).toBeInTheDocument();
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it("renders SCR-04 when the callback reports an already-used link", async () => {
+    const handleRedirectCallback = vi.fn().mockRejectedValue({ errors: [{ code: "verification_already_verified" }] });
+    render(<SsoCallbackContainer returnTo="/dashboard" deps={{ handleRedirectCallback }} />);
+
+    expect(await screen.findByText(/no longer valid/i)).toBeInTheDocument();
+  });
 });
