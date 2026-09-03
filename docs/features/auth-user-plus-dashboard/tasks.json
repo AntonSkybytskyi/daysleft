@@ -1,0 +1,162 @@
+{
+  "slug": "auth-user-plus-dashboard",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Promote staged users migration into the live migrations tree",
+      "layer": "migration",
+      "deps": [],
+      "acs": ["AC-01", "AC-03"],
+      "dod": "the staged 01_create_users up/down migration applies and reverts cleanly against a fresh Postgres database",
+      "files_hint": [
+        "docs/features/auth-user-plus-dashboard/migrations/01_create_users.up.sql",
+        "docs/features/auth-user-plus-dashboard/migrations/01_create_users.down.sql",
+        "migrations/"
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Implement the account-linking-by-verified-email invariant as a pure function",
+      "layer": "domain",
+      "deps": [],
+      "acs": ["AC-03", "AC-03b"],
+      "dod": "unit tests confirm: same verified email under two methods resolves to one existing account; a payload with no verified email is rejected before any persistence call",
+      "files_hint": ["src/modules/auth/app/account-linking.ts"]
+    },
+    {
+      "id": "T3",
+      "title": "Build the Drizzle repository for the users shadow table",
+      "layer": "infra",
+      "deps": ["T1", "T2"],
+      "acs": ["AC-01", "AC-03"],
+      "dod": "integration tests confirm findByEmail, findById and upsert-by-id against the live users table, including the UNIQUE(email) conflict path",
+      "files_hint": ["src/modules/auth/infra/users-repository.ts"]
+    },
+    {
+      "id": "T4",
+      "title": "Wire the Clerk SDK client and Svix webhook-signature verification helper",
+      "layer": "infra",
+      "deps": [],
+      "acs": [],
+      "dod": "unit tests confirm a validly-signed Svix payload verifies and a tampered one is rejected; Clerk client reads config from env with no secret committed",
+      "files_hint": ["src/modules/auth/infra/clerk-client.ts", "src/modules/auth/infra/verify-webhook.ts"]
+    },
+    {
+      "id": "T5",
+      "title": "Implement the Clerk webhook route handler (POST /webhooks/clerk)",
+      "layer": "ports",
+      "deps": ["T3", "T4"],
+      "acs": ["AC-01", "AC-03", "AC-03b"],
+      "dod": "handler returns 200 with the upserted User on a verified user.created/user.updated event, 401 auth.webhook_invalid_signature on bad Svix signature, 422 auth.email_required when no verified email is present, and redelivery with the same svix-id is deduped",
+      "files_hint": ["src/modules/auth/infra/routes/clerk-webhook.ts", "src/app/webhooks/clerk/route.ts"]
+    },
+    {
+      "id": "T6",
+      "title": "Build the session-read helper with the synchronous create-or-fetch fallback",
+      "layer": "app",
+      "deps": ["T3", "T4"],
+      "acs": ["AC-01", "AC-05", "AC-06"],
+      "dod": "unit/integration tests confirm: a valid Clerk session resolves to the local user row, creating it on the spot if the webhook hasn't landed yet (sad.md §11 risk mitigation); no session or an expired/invalid one resolves to a typed unauthenticated result with no data leaked",
+      "files_hint": ["src/modules/auth/app/session.ts"]
+    },
+    {
+      "id": "T7",
+      "title": "Implement the dashboard route handler (GET /api/v1/dashboard)",
+      "layer": "ports",
+      "deps": ["T6"],
+      "acs": ["AC-05", "AC-07"],
+      "dod": "handler returns 200 DashboardData with has_trips:false for a valid session, and 401 auth.session_invalid with details.return_to set to the originally requested path when unauthenticated",
+      "files_hint": ["src/modules/dashboard/app/get-dashboard.ts", "src/app/api/v1/dashboard/route.ts"]
+    },
+    {
+      "id": "T8",
+      "title": "Implement the logout route handler (POST /api/v1/auth/logout)",
+      "layer": "ports",
+      "deps": ["T6"],
+      "acs": ["AC-06"],
+      "dod": "handler revokes the session server-side via the Clerk SDK and returns 204; a subsequent dashboard request on the same browser returns 401; a request with no active session returns 401 auth.session_invalid",
+      "files_hint": ["src/modules/auth/app/logout.ts", "src/app/api/v1/auth/logout/route.ts"]
+    },
+    {
+      "id": "T9",
+      "title": "Add return-to origin validation and the unauthenticated-dashboard redirect path",
+      "layer": "wiring",
+      "deps": ["T6"],
+      "acs": ["AC-04", "AC-05"],
+      "dod": "unit tests confirm a return-to URL sharing this app's scheme/host/port is preserved and round-tripped after login, and any off-origin return-to value is discarded in favor of the default dashboard destination",
+      "files_hint": ["src/modules/dashboard/app/return-to.ts", "src/middleware.ts"]
+    },
+    {
+      "id": "T10",
+      "title": "Build the i18n message catalog and translate() helper",
+      "layer": "infra",
+      "deps": [],
+      "acs": ["AC-08"],
+      "dod": "unit tests confirm translate(key) resolves from en.json for a supported Accept-Language and falls back to English for an unsupported one",
+      "files_hint": ["src/lib/i18n/en.json", "src/lib/i18n/translate.ts"]
+    },
+    {
+      "id": "T11",
+      "title": "Build the new shared UI primitives (OAuthProviderButton, EmailInput, Button, LinkButton, Alert, Spinner, Header, EmptyState)",
+      "layer": "ui",
+      "deps": ["T10"],
+      "acs": [],
+      "dod": "each primitive has a component test for its documented states (incl. loading variants) and is registered in docs/design-system.md",
+      "files_hint": ["src/components/ui/", "docs/design-system.md"]
+    },
+    {
+      "id": "T12",
+      "title": "Build SCR-01 Login screen, all 5 states",
+      "layer": "ui",
+      "deps": ["T11"],
+      "acs": ["AC-01", "AC-01b", "AC-03b", "AC-05"],
+      "dod": "component tests cover default, loading, error-sign-in-failed, error-email-required and redirected-sign-in-required exactly as screens.md SCR-01 specifies",
+      "files_hint": ["src/modules/auth/ui/login/"]
+    },
+    {
+      "id": "T13",
+      "title": "Build SCR-02 Check your email screen, all 4 states",
+      "layer": "ui",
+      "deps": ["T11"],
+      "acs": ["AC-02b"],
+      "dod": "component tests cover default, loading, resent-confirmation and error-rate-limited exactly as screens.md SCR-02 specifies",
+      "files_hint": ["src/modules/auth/ui/check-email/"]
+    },
+    {
+      "id": "T14",
+      "title": "Build SCR-04 Magic-link invalid screen, all 3 states",
+      "layer": "ui",
+      "deps": ["T11"],
+      "acs": ["AC-02"],
+      "dod": "component tests cover default, loading and error-rate-limited exactly as screens.md SCR-04 specifies",
+      "files_hint": ["src/modules/auth/ui/magic-link-invalid/"]
+    },
+    {
+      "id": "T15",
+      "title": "Build SCR-03 Dashboard shell screen, both states, wired to the dashboard and logout handlers",
+      "layer": "ui",
+      "deps": ["T7", "T8", "T11"],
+      "acs": ["AC-06", "AC-07"],
+      "dod": "component tests cover loading and default/empty exactly as screens.md SCR-03 specifies; the header logout button calls the T8 logout handler and redirects to login",
+      "files_hint": ["src/modules/dashboard/ui/"]
+    },
+    {
+      "id": "T16",
+      "title": "Write integration tests for the QG-1 security scenarios",
+      "layer": "tests",
+      "deps": ["T5", "T7", "T8", "T9"],
+      "acs": ["AC-03", "AC-06"],
+      "dod": "integration tests assert (a) two sign-ins with the same verified email via different methods resolve to one account, (b) a dashboard request after logout on the same session is denied, (c) an off-origin return-to param is rejected",
+      "files_hint": ["tests/integration/auth/"]
+    },
+    {
+      "id": "T17",
+      "title": "Write e2e tests for the sign-up-to-dashboard and return-to happy paths",
+      "layer": "tests",
+      "deps": ["T12", "T15", "T9", "T10"],
+      "acs": ["AC-01", "AC-04", "AC-05", "AC-07", "AC-08"],
+      "dod": "Playwright e2e covers: sign-up reaches the dashboard, an unauthenticated dashboard visit redirects to login and returns to the originally requested page after sign-in, a fresh account sees the empty-state dashboard, and the shell falls back to English for an unsupported browser locale",
+      "files_hint": ["e2e/auth-dashboard.spec.ts"]
+    }
+  ]
+}
