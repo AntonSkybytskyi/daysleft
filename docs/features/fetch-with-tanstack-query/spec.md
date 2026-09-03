@@ -142,6 +142,47 @@ Two scoping notes that every duration/count guarantee below is measured against:
 - **Dashboard loading-state coverage on fetching loads** — baseline: 0% of loads that actually fetch show a differentiated loading indicator (today's code renders no distinct loading UI state); target: 100% of loads that perform a real fetch (a cache-served revisit is exempt — AC-01 forbids showing a loading state there), verified by test coverage at launch.
 - **Post-logout stale-data reports** — baseline: 0 (new metric, no prior cache existed to leak), target: remains 0; monitored via manual triage of support tickets (automated ticket tagging is out of scope, §3).
 
+## Test plan
+
+One-line frame: this feature must make the dashboard's data fetch de-duplicated, explicitly loading/error-stated, and safe against a read that performs a write and returns a one-shot flag — without leaking cached data across a logout/sign-in identity boundary.
+
+**Levels used:** component (a UI surface is declared in `sad.md` `target_surfaces`), unit, integration. No contract/e2e-through-UI/visual-regression/load rows this pass (see notes below).
+
+### AC coverage
+
+| AC (spec §5) | Test name (intent-based) | Level | Expected outcome |
+|---|---|---|---|
+| AC-01 (happy) | cache-hit revisit renders instantly with no duplicate fetch | component | same summary shown immediately, exactly one fetch call total across both renders |
+| AC-02 (error) | non-session failure shows a recoverable error with a single manual retry | component | error state with one retry control renders; no automatic retry fires; triggering it issues exactly one more fetch |
+| AC-03 (authorization) | confirmed invalid session redirects to sign-in, distinct from a connectivity failure | component | redirected to sign-in with no dashboard data shown; a paired case proves a plain connectivity failure does NOT redirect (goes to AC-02's error state instead) |
+| AC-04 (domain invariant) | linked confirmation survives a retry whose response omits the flag | component | confirmation stays visible after the retry, not re-triggered and not hidden |
+| AC-05 (cross-context) | identity-scoped cache key and clear-helper behave correctly | unit | the key function returns a different key per Traveler identity; the clear helper removes exactly the calling Traveler's entry |
+| AC-05 (cross-context) | logout clears the cache; a different Traveler's fetch never reads the old entry | integration | the entry is gone immediately after the logout response confirms server-side revocation; a subsequently-signed-in different Traveler's fetch reads only its own data |
+| AC-06 (happy) | loading indicator shows on first load and on retry | component | the loading indicator renders before each fetch resolves, both on first mount and after triggering the AC-02 retry |
+
+### Edge cases / error paths
+
+- Unreadable/malformed response body → expected: falls into AC-02's recoverable-error path, not a crash or a silent blank screen.
+- Backend dependency unavailable / request times out → expected: same AC-02 recoverable-error path (no distinct behavior from a plain connectivity failure).
+- Session already expired on the very first load (not just a later fetch) → expected: AC-03's redirect fires on the first attempt too, not only on a retry.
+- Client-side sign-out step fails after the server already confirmed the logout → expected: the cache is still cleared (AC-05 holds) even though the UI shows the existing `error-logout-failed` state.
+- Retry control triggered while a retry is already in flight → expected: the control is disabled during the in-flight request (its own `loading` prop), so no second concurrent fetch is issued.
+
+### Test data
+
+- Seed strategy: no new entities (`data-model.md` legally absent — no schema change); test fixtures are plain response objects shaped like the existing `/api/v1/dashboard` payload (`linked`, summary fields), varied per scenario.
+- Integration dependency: the real (in-memory, ephemeral per test) TanStack Query cache instance — not a mocked cache. No datastore is involved (no backend change).
+- Cleanup boundary: per-test — each test constructs its own `QueryClient` instance and discards it, so no state leaks between tests.
+
+### NFR validation (load)
+
+<!-- N/A: the one numeric NFR (dashboard first-load latency ≤ 500 ms, spec §6) is client-side render timing verified by a component-level test assertion, not a throughput/load scenario — there is no server-side change and no request-rate target to load-test. -->
+
+### CI placement
+
+- On every PR: all component and unit tests (fast).
+- Integration (the cache/logout test) also runs on every PR — it's in-memory and fast, no throwaway external dependency needed.
+
 ## 8. Open questions
 
 - [ ] Should this feature also define a shared query-key convention/registry so a second module adopting the same pattern doesn't collide with the dashboard's cache key? Default now: no — the dashboard owns its own key informally, per module-ownership convention. — owner: Tech Lead, due: before the next feature adds a second cached query
