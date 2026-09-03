@@ -2,7 +2,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getClerkWebhookSecret } from "@/modules/auth/infra/clerk-client";
 import { createDbClient } from "@/db/client";
 import { UsersRepository } from "@/modules/auth/infra/users-repository";
-import { handleClerkWebhook } from "@/modules/auth/infra/routes/clerk-webhook";
+import { createInMemoryDedupeStore, handleClerkWebhook } from "@/modules/auth/infra/routes/clerk-webhook";
+
+const dedupeStore = createInMemoryDedupeStore();
 
 export async function POST(request: NextRequest) {
   const rawBody = await request.text();
@@ -17,7 +19,7 @@ export async function POST(request: NextRequest) {
 
   const result = await handleClerkWebhook(
     { headers, rawBody },
-    { webhookSecret: getClerkWebhookSecret(), repository },
+    { webhookSecret: getClerkWebhookSecret(), repository, dedupeStore },
   );
 
   return NextResponse.json(result.body, { status: result.status });

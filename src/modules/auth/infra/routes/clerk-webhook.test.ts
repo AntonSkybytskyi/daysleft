@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { UsersRepository } from "../users-repository";
-import { handleClerkWebhook } from "./clerk-webhook";
+import { createInMemoryDedupeStore, handleClerkWebhook } from "./clerk-webhook";
 
 const webhookSecret = "whsec_test_secret";
 
@@ -80,20 +80,21 @@ describe("handleClerkWebhook", () => {
     expect(repository.upsertById).not.toHaveBeenCalled();
   });
 
-  it("dedupes a redelivery with the same svix-id by upserting idempotently to the same result", async () => {
+  it("dedupes a redelivery with the same svix-id — a single upsert, the same cached result returned twice", async () => {
     const repository = fakeRepository();
     const verify = vi.fn().mockReturnValue({ valid: true, event: JSON.parse(eventPayload()) });
+    const dedupeStore = createInMemoryDedupeStore();
 
     const first = await handleClerkWebhook(
       { headers: validHeaders, rawBody: eventPayload() },
-      { webhookSecret, repository, verify },
+      { webhookSecret, repository, verify, dedupeStore },
     );
     const second = await handleClerkWebhook(
       { headers: validHeaders, rawBody: eventPayload() },
-      { webhookSecret, repository, verify },
+      { webhookSecret, repository, verify, dedupeStore },
     );
 
     expect(first).toEqual(second);
-    expect(repository.upsertById).toHaveBeenCalledTimes(2);
+    expect(repository.upsertById).toHaveBeenCalledTimes(1);
   });
 });

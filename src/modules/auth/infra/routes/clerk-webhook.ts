@@ -8,10 +8,16 @@ export type ClerkWebhookRequest = {
   rawBody: string;
 };
 
+export type WebhookDedupeStore = {
+  get: (svixId: string) => ClerkWebhookResult | undefined;
+  set: (svixId: string, result: ClerkWebhookResult) => void;
+};
+
 export type ClerkWebhookDeps = {
   webhookSecret: string;
   repository: UsersRepository;
   verify?: typeof verifyClerkWebhook;
+  dedupeStore?: WebhookDedupeStore;
 };
 
 export type ClerkWebhookResult = {
@@ -26,6 +32,12 @@ export async function handleClerkWebhook(
   request: ClerkWebhookRequest,
   deps: ClerkWebhookDeps,
 ): Promise<ClerkWebhookResult> {
+  const svixId = request.headers["svix-id"];
+  const cached = svixId ? deps.dedupeStore?.get(svixId) : undefined;
+  if (cached) {
+    return cached;
+  }
+
   const verify = deps.verify ?? verifyClerkWebhook;
   const verification = verify(request.rawBody, request.headers, deps.webhookSecret);
 
@@ -58,13 +70,30 @@ export async function handleClerkWebhook(
     };
   }
 
-  return {
+  const success: ClerkWebhookResult = {
     status: 200,
     body: {
       id: result.user.id,
       email: result.user.email,
       created_at: result.user.createdAt,
       updated_at: result.user.updatedAt,
+    },
+  };
+  if (svixId) {
+    deps.dedupeStore?.set(svixId, success);
+  }
+  return success;
+}
+
+// In-memory only: dedupe within this server instance's lifetime. Redeliveries
+// after a restart or to a different instance still re-upsert, which is safe
+// (upsertById is idempotent) — this only avoids the redundant write.
+export function createInMemoryDedupeStore(): WebhookDedupeStore {
+  const seen = new Map<string, ClerkWebhookResult>();
+  return {
+    get: (svixId) => seen.get(svixId),
+    set: (svixId, result) => {
+      seen.set(svixId, result);
     },
   };
 }
