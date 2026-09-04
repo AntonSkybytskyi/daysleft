@@ -394,3 +394,48 @@ describe("DashboardContainer — TanStack Query migration (T3)", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("DashboardContainer — linked confirmation durability (T5)", () => {
+  it("AC-04: keeps the linked confirmation visible after a later fetch whose response reads linked:false", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        mockFetchResponse(200, { user: { id: "u1", email: "a@b.com" }, has_trips: false, linked: true }),
+      )
+      .mockResolvedValueOnce(
+        mockFetchResponse(200, { user: { id: "u1", email: "a@b.com" }, has_trips: false, linked: false }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { client } = renderDashboard();
+
+    await waitFor(() => expect(screen.getByText(/signed in to your existing account/i)).toBeInTheDocument());
+
+    // A later fetch in the same sign-in session (the AC-02 retry path re-fetches this same
+    // query) whose response no longer carries linked:true must never retract the confirmation
+    // already shown, nor re-run the account-linking action.
+    await client.refetchQueries({ queryKey: dashboardQueryModule.dashboardQueryKey("u1") });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+    expect(screen.getByText(/signed in to your existing account/i)).toBeInTheDocument();
+  });
+
+  it("AC-04 guard: never shows the linked confirmation when no fetch this session ever reported linked:true", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        mockFetchResponse(200, { user: { id: "u1", email: "a@b.com" }, has_trips: false, linked: false }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { client } = renderDashboard();
+
+    await waitFor(() => expect(screen.getByText(/nothing tracked yet/i)).toBeInTheDocument());
+    expect(screen.queryByText(/signed in to your existing account/i)).not.toBeInTheDocument();
+
+    await client.refetchQueries({ queryKey: dashboardQueryModule.dashboardQueryKey("u1") });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+    expect(screen.queryByText(/signed in to your existing account/i)).not.toBeInTheDocument();
+  });
+});

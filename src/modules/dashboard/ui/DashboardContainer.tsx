@@ -50,7 +50,16 @@ export function DashboardContainer({ strings }: DashboardContainerProps = {}) {
         : "loading";
 
   const renderStatus: DashboardScreenState = status === "error-logout-failed" ? status : dashboardStatus;
-  const linked = query.data?.linked ?? false;
+
+  // Once shown, the linked confirmation must survive a later fetch (e.g. an AC-02 retry)
+  // whose response no longer carries linked:true — it's a durable fact about this sign-in
+  // session, not a live reflection of the most recent response.
+  const [linked, setLinked] = useState(false);
+  useEffect(() => {
+    if (query.data?.linked) {
+      setLinked(true);
+    }
+  }, [query.data?.linked]);
 
   const handleLogout = async () => {
     let response: Response;
