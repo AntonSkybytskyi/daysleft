@@ -41,6 +41,23 @@ describe("DashboardScreen", () => {
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
+  it("error: renders a retry control that calls onRetry when clicked", async () => {
+    const onRetry = vi.fn();
+    render(<DashboardScreen state="error" onLogout={vi.fn()} onRetry={onRetry} />);
+
+    const retryButton = screen.getByRole("button", { name: "Try again" });
+    await userEvent.click(retryButton);
+    expect(onRetry).toHaveBeenCalledOnce();
+  });
+
+  it("error: shows the retry control's in-flight spinner and disables it while isRetrying", () => {
+    render(<DashboardScreen state="error" onLogout={vi.fn()} onRetry={vi.fn()} isRetrying />);
+
+    const retryButton = screen.getByRole("button", { name: "Try again" });
+    expect(retryButton).toBeDisabled();
+    expect(screen.getByRole("status")).toBeInTheDocument();
+  });
+
   it("error-logout-failed: shows a logout-specific message, not the dashboard-fetch-failure one", () => {
     render(<DashboardScreen state="error-logout-failed" onLogout={vi.fn()} onRetry={vi.fn()} />);
 
