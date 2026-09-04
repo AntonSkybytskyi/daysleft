@@ -1,9 +1,11 @@
 "use client";
 
-import { useClerk } from "@clerk/nextjs";
+import { useClerk, useUser } from "@clerk/nextjs";
+import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { DashboardScreen, type DashboardScreenStrings } from "./DashboardScreen";
+import { DashboardSessionInvalidError, dashboardQueryOptions } from "@/modules/dashboard/app/dashboard-query";
+import { DashboardScreen, type DashboardScreenState, type DashboardScreenStrings } from "./DashboardScreen";
 
 export type DashboardContainerProps = {
   strings?: Partial<DashboardScreenStrings>;
@@ -12,46 +14,32 @@ export type DashboardContainerProps = {
 export function DashboardContainer({ strings }: DashboardContainerProps = {}) {
   const router = useRouter();
   const clerk = useClerk();
-  const [status, setStatus] = useState<"loading" | "default" | "error" | "error-logout-failed">("loading");
-  const [linked, setLinked] = useState(false);
+  const { user, isLoaded } = useUser();
+  // Logout failures are tracked separately from the dashboard query's own status —
+  // a failed logout must keep showing its own error regardless of what the query is doing.
+  const [status, setStatus] = useState<"idle" | "error-logout-failed">("idle");
+
+  const enabled = isLoaded && Boolean(user);
+  const query = useQuery({
+    ...dashboardQueryOptions(user?.id ?? ""),
+    enabled,
+  });
+
+  const sessionInvalidError = query.error instanceof DashboardSessionInvalidError ? query.error : undefined;
 
   useEffect(() => {
-    let cancelled = false;
-    const path = `${window.location.pathname}${window.location.search}`;
+    if (sessionInvalidError) {
+      router.replace(sessionInvalidError.loginUrl);
+    }
+  }, [sessionInvalidError, router]);
 
-    fetch(`/api/v1/dashboard?path=${encodeURIComponent(path)}`)
-      .then(async (response) => {
-        if (cancelled) {
-          return;
-        }
-        if (response.status === 401) {
-          const { error } = await response.json();
-          const loginUrl =
-            error?.code === "auth.email_required"
-              ? "/login?error=email_required"
-              : error?.code === "auth.email_conflict"
-                ? "/login?error=email_conflict"
-                : `/login?return_to=${encodeURIComponent(error?.details?.return_to ?? path)}`;
-          router.replace(loginUrl);
-          return;
-        }
-        const body = await response.json();
-        setLinked(Boolean(body.linked));
-        setStatus("default");
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setStatus("error");
-        }
-      });
+  // A confirmed invalid session redirects away — never render dashboard data or the
+  // generic error state while that navigation is in flight.
+  const dashboardStatus: DashboardScreenState =
+    !enabled || query.isPending || sessionInvalidError ? "loading" : query.isError ? "error" : "default";
 
-    return () => {
-      cancelled = true;
-    };
-    // Fetch once on mount — re-running on every router identity change would
-    // re-issue the request and re-consume the 401/200 response body.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const renderStatus: DashboardScreenState = status === "error-logout-failed" ? status : dashboardStatus;
+  const linked = query.data?.linked ?? false;
 
   const handleLogout = async () => {
     let response: Response;
@@ -93,5 +81,5 @@ export function DashboardContainer({ strings }: DashboardContainerProps = {}) {
     setStatus("error-logout-failed");
   };
 
-  return <DashboardScreen state={status} onLogout={handleLogout} linked={linked} strings={strings} />;
+  return <DashboardScreen state={renderStatus} onLogout={handleLogout} linked={linked} strings={strings} />;
 }

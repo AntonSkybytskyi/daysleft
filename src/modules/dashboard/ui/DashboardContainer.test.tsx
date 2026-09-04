@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -10,24 +11,50 @@ vi.mock("next/navigation", () => ({
 const signOut = vi.fn().mockResolvedValue(undefined);
 vi.mock("@clerk/nextjs", () => ({
   useClerk: () => ({ signOut }),
+  useUser: () => ({ user: { id: "u1" }, isLoaded: true }),
 }));
 
+vi.mock("@/modules/dashboard/app/dashboard-query", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/modules/dashboard/app/dashboard-query")>();
+  return {
+    ...actual,
+    dashboardQueryOptions: vi.fn(actual.dashboardQueryOptions),
+  };
+});
+
+import * as dashboardQueryModule from "@/modules/dashboard/app/dashboard-query";
 import { DashboardContainer } from "./DashboardContainer";
+
+function renderDashboard(client: QueryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })) {
+  return {
+    client,
+    ...render(
+      <QueryClientProvider client={client}>
+        <DashboardContainer />
+      </QueryClientProvider>,
+    ),
+  };
+}
+
+function mockFetchResponse(status: number, body?: unknown) {
+  return { status, ok: status >= 200 && status < 300, json: async () => body };
+}
 
 afterEach(() => {
   vi.unstubAllGlobals();
   replace.mockClear();
   signOut.mockClear();
+  vi.mocked(dashboardQueryModule.dashboardQueryOptions).mockClear();
 });
 
 describe("DashboardContainer", () => {
   it("shows loading, then the empty-state dashboard once the fetch resolves", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({ status: 200, json: async () => ({ user: { id: "u1", email: "a@b.com" }, has_trips: false }) }),
+      vi.fn().mockResolvedValue(mockFetchResponse(200, { user: { id: "u1", email: "a@b.com" }, has_trips: false })),
     );
 
-    render(<DashboardContainer />);
+    renderDashboard();
 
     expect(screen.getByRole("status")).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText(/nothing tracked yet/i)).toBeInTheDocument());
@@ -36,13 +63,12 @@ describe("DashboardContainer", () => {
   it("shows the linked-account banner when the dashboard response reports linked:true", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({
-        status: 200,
-        json: async () => ({ user: { id: "u1", email: "a@b.com" }, has_trips: false, linked: true }),
-      }),
+      vi.fn().mockResolvedValue(
+        mockFetchResponse(200, { user: { id: "u1", email: "a@b.com" }, has_trips: false, linked: true }),
+      ),
     );
 
-    render(<DashboardContainer />);
+    renderDashboard();
 
     await waitFor(() => expect(screen.getByText(/signed in to your existing account/i)).toBeInTheDocument());
   });
@@ -50,15 +76,14 @@ describe("DashboardContainer", () => {
   it("redirects to /login, forwarding the server's return_to, when the dashboard fetch returns 401", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({
-        status: 401,
-        json: async () => ({
+      vi.fn().mockResolvedValue(
+        mockFetchResponse(401, {
           error: { code: "auth.session_invalid", details: { return_to: "/dashboard/trips/123" } },
         }),
-      }),
+      ),
     );
 
-    render(<DashboardContainer />);
+    renderDashboard();
 
     await waitFor(() =>
       expect(replace).toHaveBeenCalledWith(`/login?return_to=${encodeURIComponent("/dashboard/trips/123")}`),
@@ -68,7 +93,7 @@ describe("DashboardContainer", () => {
   it("shows an error instead of spinning forever when the dashboard fetch rejects", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network down")));
 
-    render(<DashboardContainer />);
+    renderDashboard();
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/couldn.t load your dashboard/i);
   });
@@ -76,10 +101,10 @@ describe("DashboardContainer", () => {
   it("redirects to /login?error=email_required when the dashboard fetch returns 401 auth.email_required", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({ status: 401, json: async () => ({ error: { code: "auth.email_required" } }) }),
+      vi.fn().mockResolvedValue(mockFetchResponse(401, { error: { code: "auth.email_required" } })),
     );
 
-    render(<DashboardContainer />);
+    renderDashboard();
 
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/login?error=email_required"));
   });
@@ -87,10 +112,10 @@ describe("DashboardContainer", () => {
   it("redirects to /login?error=email_conflict when the dashboard fetch returns 401 auth.email_conflict", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({ status: 401, json: async () => ({ error: { code: "auth.email_conflict" } }) }),
+      vi.fn().mockResolvedValue(mockFetchResponse(401, { error: { code: "auth.email_conflict" } })),
     );
 
-    render(<DashboardContainer />);
+    renderDashboard();
 
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/login?error=email_conflict"));
   });
@@ -98,11 +123,11 @@ describe("DashboardContainer", () => {
   it("calls the logout endpoint and redirects to /login when Log out is clicked", async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce({ status: 200, json: async () => ({ user: { id: "u1", email: "a@b.com" }, has_trips: false }) })
-      .mockResolvedValueOnce({ status: 204 });
+      .mockResolvedValueOnce(mockFetchResponse(200, { user: { id: "u1", email: "a@b.com" }, has_trips: false }))
+      .mockResolvedValueOnce(mockFetchResponse(204));
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<DashboardContainer />);
+    renderDashboard();
     await waitFor(() => expect(screen.getByText(/nothing tracked yet/i)).toBeInTheDocument());
 
     await userEvent.click(screen.getByRole("button", { name: "Log out" }));
@@ -115,11 +140,11 @@ describe("DashboardContainer", () => {
   it("clears the client-side Clerk session on logout, not only the server-side one", async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce({ status: 200, json: async () => ({ user: { id: "u1", email: "a@b.com" }, has_trips: false }) })
-      .mockResolvedValueOnce({ status: 204 });
+      .mockResolvedValueOnce(mockFetchResponse(200, { user: { id: "u1", email: "a@b.com" }, has_trips: false }))
+      .mockResolvedValueOnce(mockFetchResponse(204));
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<DashboardContainer />);
+    renderDashboard();
     await waitFor(() => expect(screen.getByText(/nothing tracked yet/i)).toBeInTheDocument());
 
     await userEvent.click(screen.getByRole("button", { name: "Log out" }));
@@ -130,11 +155,11 @@ describe("DashboardContainer", () => {
   it("does not clear the client-side Clerk session when the server didn't actually revoke it", async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce({ status: 200, json: async () => ({ user: { id: "u1", email: "a@b.com" }, has_trips: false }) })
-      .mockResolvedValueOnce({ status: 500 });
+      .mockResolvedValueOnce(mockFetchResponse(200, { user: { id: "u1", email: "a@b.com" }, has_trips: false }))
+      .mockResolvedValueOnce(mockFetchResponse(500));
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<DashboardContainer />);
+    renderDashboard();
     await waitFor(() => expect(screen.getByText(/nothing tracked yet/i)).toBeInTheDocument());
 
     await userEvent.click(screen.getByRole("button", { name: "Log out" }));
@@ -146,11 +171,11 @@ describe("DashboardContainer", () => {
   it("shows a logout-specific error (not the dashboard-fetch one) instead of redirecting when the logout request fails server-side", async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce({ status: 200, json: async () => ({ user: { id: "u1", email: "a@b.com" }, has_trips: false }) })
-      .mockResolvedValueOnce({ status: 500 });
+      .mockResolvedValueOnce(mockFetchResponse(200, { user: { id: "u1", email: "a@b.com" }, has_trips: false }))
+      .mockResolvedValueOnce(mockFetchResponse(500));
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<DashboardContainer />);
+    renderDashboard();
     await waitFor(() => expect(screen.getByText(/nothing tracked yet/i)).toBeInTheDocument());
 
     await userEvent.click(screen.getByRole("button", { name: "Log out" }));
@@ -162,12 +187,12 @@ describe("DashboardContainer", () => {
   it("redirects to /login even when clerk.signOut() rejects, since the server already revoked the session (204)", async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce({ status: 200, json: async () => ({ user: { id: "u1", email: "a@b.com" }, has_trips: false }) })
-      .mockResolvedValueOnce({ status: 204 });
+      .mockResolvedValueOnce(mockFetchResponse(200, { user: { id: "u1", email: "a@b.com" }, has_trips: false }))
+      .mockResolvedValueOnce(mockFetchResponse(204));
     vi.stubGlobal("fetch", fetchMock);
     signOut.mockRejectedValueOnce(new Error("network blip"));
 
-    render(<DashboardContainer />);
+    renderDashboard();
     await waitFor(() => expect(screen.getByText(/nothing tracked yet/i)).toBeInTheDocument());
 
     await userEvent.click(screen.getByRole("button", { name: "Log out" }));
@@ -181,12 +206,12 @@ describe("DashboardContainer", () => {
   it("retries clerk.signOut() itself (not the server logout call) when it rejects, so no live client session survives a transient blip", async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce({ status: 200, json: async () => ({ user: { id: "u1", email: "a@b.com" }, has_trips: false }) })
-      .mockResolvedValueOnce({ status: 204 });
+      .mockResolvedValueOnce(mockFetchResponse(200, { user: { id: "u1", email: "a@b.com" }, has_trips: false }))
+      .mockResolvedValueOnce(mockFetchResponse(204));
     vi.stubGlobal("fetch", fetchMock);
     signOut.mockRejectedValueOnce(new Error("network blip")).mockResolvedValueOnce(undefined);
 
-    render(<DashboardContainer />);
+    renderDashboard();
     await waitFor(() => expect(screen.getByText(/nothing tracked yet/i)).toBeInTheDocument());
 
     await userEvent.click(screen.getByRole("button", { name: "Log out" }));
@@ -200,12 +225,12 @@ describe("DashboardContainer", () => {
   it("gives up retrying clerk.signOut() after exactly 3 attempts and surfaces a failure instead of claiming a possibly-live session is gone", async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce({ status: 200, json: async () => ({ user: { id: "u1", email: "a@b.com" }, has_trips: false }) })
-      .mockResolvedValueOnce({ status: 204 });
+      .mockResolvedValueOnce(mockFetchResponse(200, { user: { id: "u1", email: "a@b.com" }, has_trips: false }))
+      .mockResolvedValueOnce(mockFetchResponse(204));
     vi.stubGlobal("fetch", fetchMock);
     signOut.mockRejectedValue(new Error("network down"));
 
-    render(<DashboardContainer />);
+    renderDashboard();
     await waitFor(() => expect(screen.getByText(/nothing tracked yet/i)).toBeInTheDocument());
 
     await userEvent.click(screen.getByRole("button", { name: "Log out" }));
@@ -223,13 +248,13 @@ describe("DashboardContainer", () => {
   it("waits between clerk.signOut() retry attempts instead of firing them back-to-back", async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce({ status: 200, json: async () => ({ user: { id: "u1", email: "a@b.com" }, has_trips: false }) })
-      .mockResolvedValueOnce({ status: 204 });
+      .mockResolvedValueOnce(mockFetchResponse(200, { user: { id: "u1", email: "a@b.com" }, has_trips: false }))
+      .mockResolvedValueOnce(mockFetchResponse(204));
     vi.stubGlobal("fetch", fetchMock);
     signOut.mockRejectedValueOnce(new Error("blip 1")).mockResolvedValueOnce(undefined);
     const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
 
-    render(<DashboardContainer />);
+    renderDashboard();
     await waitFor(() => expect(screen.getByText(/nothing tracked yet/i)).toBeInTheDocument());
 
     await userEvent.click(screen.getByRole("button", { name: "Log out" }));
@@ -242,16 +267,83 @@ describe("DashboardContainer", () => {
   it("shows a logout-specific error (not the dashboard-fetch one) instead of redirecting when the logout request rejects (network failure)", async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce({ status: 200, json: async () => ({ user: { id: "u1", email: "a@b.com" }, has_trips: false }) })
+      .mockResolvedValueOnce(mockFetchResponse(200, { user: { id: "u1", email: "a@b.com" }, has_trips: false }))
       .mockRejectedValueOnce(new Error("network down"));
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<DashboardContainer />);
+    renderDashboard();
     await waitFor(() => expect(screen.getByText(/nothing tracked yet/i)).toBeInTheDocument());
 
     await userEvent.click(screen.getByRole("button", { name: "Log out" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/couldn.t sign you out/i);
     expect(replace).not.toHaveBeenCalledWith("/login");
+  });
+});
+
+describe("DashboardContainer — TanStack Query migration (T3)", () => {
+  it("AC-01: a cache-hit revisit renders the summary immediately with no loading state and no second fetch", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(mockFetchResponse(200, { user: { id: "u1", email: "a@b.com" }, has_trips: false }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { client, unmount } = renderDashboard();
+    await waitFor(() => expect(screen.getByText(/nothing tracked yet/i)).toBeInTheDocument());
+    unmount();
+
+    renderDashboard(client);
+
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.getByText(/nothing tracked yet/i)).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(dashboardQueryModule.dashboardQueryOptions).toHaveBeenCalledWith("u1");
+  });
+
+  it("AC-06: shows the loading indicator on first load until the fetch resolves", async () => {
+    let resolveFetch!: (value: unknown) => void;
+    const pendingFetch = new Promise((resolve) => {
+      resolveFetch = resolve;
+    });
+    vi.stubGlobal("fetch", vi.fn().mockReturnValue(pendingFetch));
+
+    renderDashboard();
+
+    expect(screen.getByRole("status")).toBeInTheDocument();
+    expect(screen.queryByText(/nothing tracked yet/i)).not.toBeInTheDocument();
+
+    resolveFetch(mockFetchResponse(200, { user: { id: "u1", email: "a@b.com" }, has_trips: false }));
+
+    await waitFor(() => expect(screen.getByText(/nothing tracked yet/i)).toBeInTheDocument());
+    expect(dashboardQueryModule.dashboardQueryOptions).toHaveBeenCalledWith("u1");
+  });
+
+  it("AC-03: a confirmed invalid-session fetch redirects to sign-in and shows no dashboard data", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        mockFetchResponse(401, {
+          error: { code: "auth.session_invalid", details: { return_to: "/dashboard" } },
+        }),
+      ),
+    );
+
+    renderDashboard();
+
+    await waitFor(() =>
+      expect(replace).toHaveBeenCalledWith(`/login?return_to=${encodeURIComponent("/dashboard")}`),
+    );
+    expect(screen.queryByText(/nothing tracked yet/i)).not.toBeInTheDocument();
+    expect(dashboardQueryModule.dashboardQueryOptions).toHaveBeenCalledWith("u1");
+  });
+
+  it("AC-03 vs AC-02: a plain connectivity/server failure does NOT redirect and reaches the error state instead", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network down")));
+
+    renderDashboard();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/couldn.t load your dashboard/i);
+    expect(replace).not.toHaveBeenCalled();
+    expect(dashboardQueryModule.dashboardQueryOptions).toHaveBeenCalledWith("u1");
   });
 });
