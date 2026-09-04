@@ -1,0 +1,68 @@
+{
+  "slug": "_scaffold",
+  "tasks": [
+    {
+      "id": "S1",
+      "title": "Create the Next.js app skeleton with feature-first module structure",
+      "layer": "scaffold",
+      "deps": [],
+      "acs": [],
+      "dod": "project builds (empty) via `pnpm build`",
+      "files_hint": ["src/app/", "src/modules/", "src/db/", "package.json", "pnpm-lock.yaml", "tsconfig.json", "tailwind.config.ts"]
+    },
+    {
+      "id": "S2",
+      "title": "Wire the test harness (Vitest + Playwright) and a smoke test",
+      "layer": "scaffold",
+      "deps": ["S1"],
+      "acs": [],
+      "dod": "empty test suite runs green via `pnpm test`; `app boots` Playwright smoke test passes",
+      "files_hint": ["vitest.config.ts", "playwright.config.ts", "e2e/smoke.spec.ts"]
+    },
+    {
+      "id": "S3",
+      "title": "Set up Drizzle ORM + drizzle-kit with an initial empty migration",
+      "layer": "scaffold",
+      "deps": ["S1"],
+      "acs": [],
+      "dod": "drizzle-kit generates and applies the initial migration cleanly against a local Postgres; down migration reverts cleanly",
+      "files_hint": ["src/db/schema.ts", "drizzle.config.ts", "drizzle/"]
+    },
+    {
+      "id": "S4",
+      "title": "Wire Auth.js (NextAuth) with email + OAuth providers",
+      "layer": "scaffold",
+      "deps": ["S1", "S3"],
+      "acs": [],
+      "dod": "auth routes mount and a session can be established in a local dev run",
+      "files_hint": ["src/app/api/auth/[...nextauth]/route.ts", "src/modules/auth/"]
+    },
+    {
+      "id": "S5",
+      "title": "Add the offline layer scaffolding (service worker + Dexie local DB)",
+      "layer": "scaffold",
+      "deps": ["S1"],
+      "acs": [],
+      "dod": "app installs as a PWA and the local IndexedDB store initializes on load",
+      "files_hint": ["public/manifest.json", "src/modules/sync/local/"]
+    },
+    {
+      "id": "S6",
+      "title": "Add the CI workflow (build + test + lint)",
+      "layer": "scaffold",
+      "deps": ["S2"],
+      "acs": [],
+      "dod": "CI config is valid; the commands match the detected toolchain (pnpm build/test/lint via pnpm/action-setup)",
+      "files_hint": [".github/workflows/ci.yml"]
+    },
+    {
+      "id": "S7",
+      "title": "Write CLAUDE.md from the chosen conventions",
+      "layer": "scaffold",
+      "deps": ["S1"],
+      "acs": [],
+      "dod": "conventions doc reflects the foundation map (module style, error envelope, ID strategy, test/migration conventions)",
+      "files_hint": ["CLAUDE.md"]
+    }
+  ]
+}

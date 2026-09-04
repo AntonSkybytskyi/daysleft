@@ -1,0 +1,1234 @@
+{
+  "slug": "auth-user-plus-dashboard",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Promote staged users migration into the live migrations tree",
+      "layer": "migration",
+      "deps": [],
+      "acs": [
+        "AC-01",
+        "AC-03"
+      ],
+      "dod": "the staged 01_create_users up/down migration applies and reverts cleanly against a fresh Postgres database",
+      "files_hint": [
+        "docs/features/auth-user-plus-dashboard/migrations/01_create_users.up.sql",
+        "docs/features/auth-user-plus-dashboard/migrations/01_create_users.down.sql",
+        "migrations/"
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Implement the account-linking-by-verified-email invariant as a pure function",
+      "layer": "domain",
+      "deps": [],
+      "acs": [
+        "AC-03",
+        "AC-03b"
+      ],
+      "dod": "unit tests confirm: same verified email under two methods resolves to one existing account; a payload with no verified email is rejected before any persistence call",
+      "files_hint": [
+        "src/modules/auth/app/account-linking.ts"
+      ]
+    },
+    {
+      "id": "T3",
+      "title": "Build the Drizzle repository for the users shadow table",
+      "layer": "infra",
+      "deps": [
+        "T1",
+        "T2"
+      ],
+      "acs": [
+        "AC-01",
+        "AC-03"
+      ],
+      "dod": "integration tests confirm findByEmail, findById and upsert-by-id against the live users table, including the UNIQUE(email) conflict path",
+      "files_hint": [
+        "src/modules/auth/infra/users-repository.ts"
+      ]
+    },
+    {
+      "id": "T4",
+      "title": "Wire the Clerk SDK client and Svix webhook-signature verification helper",
+      "layer": "infra",
+      "deps": [],
+      "acs": [],
+      "dod": "unit tests confirm a validly-signed Svix payload verifies and a tampered one is rejected; Clerk client reads config from env with no secret committed",
+      "files_hint": [
+        "src/modules/auth/infra/clerk-client.ts",
+        "src/modules/auth/infra/verify-webhook.ts"
+      ]
+    },
+    {
+      "id": "T5",
+      "title": "Implement the Clerk webhook route handler (POST /webhooks/clerk)",
+      "layer": "ports",
+      "deps": [
+        "T3",
+        "T4"
+      ],
+      "acs": [
+        "AC-01",
+        "AC-03",
+        "AC-03b"
+      ],
+      "dod": "handler returns 200 with the upserted User on a verified user.created/user.updated event, 401 auth.webhook_invalid_signature on bad Svix signature, 422 auth.email_required when no verified email is present, and redelivery with the same svix-id is deduped",
+      "files_hint": [
+        "src/modules/auth/infra/routes/clerk-webhook.ts",
+        "src/app/webhooks/clerk/route.ts"
+      ]
+    },
+    {
+      "id": "T6",
+      "title": "Build the session-read helper with the synchronous create-or-fetch fallback",
+      "layer": "app",
+      "deps": [
+        "T3",
+        "T4"
+      ],
+      "acs": [
+        "AC-01",
+        "AC-05",
+        "AC-06"
+      ],
+      "dod": "unit/integration tests confirm: a valid Clerk session resolves to the local user row, creating it on the spot if the webhook hasn't landed yet (sad.md \u00a711 risk mitigation); no session or an expired/invalid one resolves to a typed unauthenticated result with no data leaked",
+      "files_hint": [
+        "src/modules/auth/app/session.ts"
+      ]
+    },
+    {
+      "id": "T7",
+      "title": "Implement the dashboard route handler (GET /api/v1/dashboard)",
+      "layer": "ports",
+      "deps": [
+        "T6"
+      ],
+      "acs": [
+        "AC-05",
+        "AC-07"
+      ],
+      "dod": "handler returns 200 DashboardData with has_trips:false for a valid session, and 401 auth.session_invalid with details.return_to set to the originally requested path when unauthenticated",
+      "files_hint": [
+        "src/modules/dashboard/app/get-dashboard.ts",
+        "src/app/api/v1/dashboard/route.ts"
+      ]
+    },
+    {
+      "id": "T8",
+      "title": "Implement the logout route handler (POST /api/v1/auth/logout)",
+      "layer": "ports",
+      "deps": [
+        "T6"
+      ],
+      "acs": [
+        "AC-06"
+      ],
+      "dod": "handler revokes the session server-side via the Clerk SDK and returns 204; a subsequent dashboard request on the same browser returns 401; a request with no active session returns 401 auth.session_invalid",
+      "files_hint": [
+        "src/modules/auth/app/logout.ts",
+        "src/app/api/v1/auth/logout/route.ts"
+      ]
+    },
+    {
+      "id": "T9",
+      "title": "Add return-to origin validation and the unauthenticated-dashboard redirect path",
+      "layer": "wiring",
+      "deps": [
+        "T6"
+      ],
+      "acs": [
+        "AC-04",
+        "AC-05"
+      ],
+      "dod": "unit tests confirm a return-to URL sharing this app's scheme/host/port is preserved and round-tripped after login, and any off-origin return-to value is discarded in favor of the default dashboard destination",
+      "files_hint": [
+        "src/modules/dashboard/app/return-to.ts",
+        "src/middleware.ts"
+      ]
+    },
+    {
+      "id": "T10",
+      "title": "Build the i18n message catalog and translate() helper",
+      "layer": "infra",
+      "deps": [],
+      "acs": [
+        "AC-08"
+      ],
+      "dod": "unit tests confirm translate(key) resolves from en.json for a supported Accept-Language and falls back to English for an unsupported one",
+      "files_hint": [
+        "src/lib/i18n/en.json",
+        "src/lib/i18n/translate.ts"
+      ]
+    },
+    {
+      "id": "T11",
+      "title": "Build the new shared UI primitives (OAuthProviderButton, EmailInput, Button, LinkButton, Alert, Spinner, Header, EmptyState)",
+      "layer": "ui",
+      "deps": [
+        "T10"
+      ],
+      "acs": [],
+      "dod": "each primitive has a component test for its documented states (incl. loading variants) and is registered in docs/design-system.md",
+      "files_hint": [
+        "src/components/ui/",
+        "docs/design-system.md"
+      ]
+    },
+    {
+      "id": "T12",
+      "title": "Build SCR-01 Login screen, all 5 states",
+      "layer": "ui",
+      "deps": [
+        "T11"
+      ],
+      "acs": [
+        "AC-01",
+        "AC-01b",
+        "AC-03b",
+        "AC-05"
+      ],
+      "dod": "component tests cover default, loading, error-sign-in-failed, error-email-required and redirected-sign-in-required exactly as screens.md SCR-01 specifies",
+      "files_hint": [
+        "src/modules/auth/ui/login/"
+      ]
+    },
+    {
+      "id": "T13",
+      "title": "Build SCR-02 Check your email screen, all 4 states",
+      "layer": "ui",
+      "deps": [
+        "T11"
+      ],
+      "acs": [
+        "AC-02b"
+      ],
+      "dod": "component tests cover default, loading, resent-confirmation and error-rate-limited exactly as screens.md SCR-02 specifies",
+      "files_hint": [
+        "src/modules/auth/ui/check-email/"
+      ]
+    },
+    {
+      "id": "T14",
+      "title": "Build SCR-04 Magic-link invalid screen, all 3 states",
+      "layer": "ui",
+      "deps": [
+        "T11"
+      ],
+      "acs": [
+        "AC-02"
+      ],
+      "dod": "component tests cover default, loading and error-rate-limited exactly as screens.md SCR-04 specifies",
+      "files_hint": [
+        "src/modules/auth/ui/magic-link-invalid/"
+      ]
+    },
+    {
+      "id": "T15",
+      "title": "Build SCR-03 Dashboard shell screen, both states, wired to the dashboard and logout handlers",
+      "layer": "ui",
+      "deps": [
+        "T7",
+        "T8",
+        "T11"
+      ],
+      "acs": [
+        "AC-06",
+        "AC-07"
+      ],
+      "dod": "component tests cover loading and default/empty exactly as screens.md SCR-03 specifies; the header logout button calls the T8 logout handler and redirects to login",
+      "files_hint": [
+        "src/modules/dashboard/ui/"
+      ]
+    },
+    {
+      "id": "T16",
+      "title": "Write integration tests for the QG-1 security scenarios",
+      "layer": "tests",
+      "deps": [
+        "T5",
+        "T7",
+        "T8",
+        "T9"
+      ],
+      "acs": [
+        "AC-03",
+        "AC-06"
+      ],
+      "dod": "integration tests assert (a) two sign-ins with the same verified email via different methods resolve to one account, (b) a dashboard request after logout on the same session is denied, (c) an off-origin return-to param is rejected",
+      "files_hint": [
+        "tests/integration/auth/"
+      ]
+    },
+    {
+      "id": "T17",
+      "title": "Write e2e tests for the sign-up-to-dashboard and return-to happy paths",
+      "layer": "tests",
+      "deps": [
+        "T12",
+        "T15",
+        "T9",
+        "T10"
+      ],
+      "acs": [
+        "AC-01",
+        "AC-04",
+        "AC-05",
+        "AC-07",
+        "AC-08"
+      ],
+      "dod": "Playwright e2e covers: sign-up reaches the dashboard, an unauthenticated dashboard visit redirects to login and returns to the originally requested page after sign-in, a fresh account sees the empty-state dashboard, and the shell falls back to English for an unsupported browser locale",
+      "files_hint": [
+        "e2e/auth-dashboard.spec.ts"
+      ]
+    },
+    {
+      "id": "T18",
+      "title": "Fix the open redirect at /login and the tautological QG-1 test that hid it",
+      "layer": "wiring",
+      "deps": [],
+      "acs": [
+        "AC-04"
+      ],
+      "dod": "an off-origin return_to on GET /login resolves to /dashboard before it ever reaches Clerk (validated in LoginPage, not only in middleware); the QG-1 test drives an untrusted return_to through the LoginPage/LoginContainer render path (not only the pure resolveReturnTo helper) and fails without the fix",
+      "files_hint": [
+        "src/app/login/page.tsx",
+        "src/modules/auth/ui/login/LoginContainer.tsx",
+        "tests/integration/auth/qg1-security.test.ts"
+      ]
+    },
+    {
+      "id": "T19",
+      "title": "Add the /sso-callback route completing OAuth and magic-link sign-in",
+      "layer": "ui",
+      "deps": [
+        "T18"
+      ],
+      "acs": [
+        "AC-01",
+        "AC-02b"
+      ],
+      "dod": "the provider/magic-link return trip lands on /sso-callback, which mounts Clerk's AuthenticateWithRedirectCallback and redirects to the validated return-to (or /dashboard) on success, instead of 404ing",
+      "files_hint": [
+        "src/app/sso-callback/page.tsx"
+      ]
+    },
+    {
+      "id": "T20",
+      "title": "Add the /check-email route mounting CheckEmailScreen with resend wiring",
+      "layer": "ui",
+      "deps": [],
+      "acs": [
+        "AC-02b"
+      ],
+      "dod": "GET /check-email?email=... renders CheckEmailScreen with a container wiring onResend to Clerk's resend call, reachable from LoginContainer's magic-link branch",
+      "files_hint": [
+        "src/app/check-email/page.tsx",
+        "src/modules/auth/ui/check-email/"
+      ]
+    },
+    {
+      "id": "T21",
+      "title": "Render SCR-04 magic-link-invalid on an expired/used/failed callback",
+      "layer": "ui",
+      "deps": [
+        "T19"
+      ],
+      "acs": [
+        "AC-02"
+      ],
+      "dod": "the /sso-callback handler renders MagicLinkInvalidScreen when Clerk's email-link verification reports expired/used/failed, and the branch is covered by a test",
+      "files_hint": [
+        "src/app/sso-callback/page.tsx",
+        "src/modules/auth/ui/magic-link-invalid/"
+      ]
+    },
+    {
+      "id": "T22",
+      "title": "Wire AC-01b's sign-in-failed error surfacing from the callback",
+      "layer": "wiring",
+      "deps": [
+        "T19"
+      ],
+      "acs": [
+        "AC-01b"
+      ],
+      "dod": "a failed or declined OAuth callback redirects to /login?error=sign_in_failed, and a test drives that callback outcome into the rendered login screen's error-sign-in-failed state",
+      "files_hint": [
+        "src/app/sso-callback/page.tsx",
+        "src/app/login/page.tsx"
+      ]
+    },
+    {
+      "id": "T23",
+      "title": "Surface AC-03b's email-required error to the Traveler on the interactive path",
+      "layer": "app",
+      "deps": [],
+      "acs": [
+        "AC-03b"
+      ],
+      "dod": "getSessionUser returns a distinct result for the no-verified-email case (not a bare unauthenticated), the login route redirects to /login?error=email_required on it, and a test asserts the rendered login screen shows the email-required alert",
+      "files_hint": [
+        "src/modules/auth/app/session.ts",
+        "src/app/login/page.tsx"
+      ]
+    },
+    {
+      "id": "T24",
+      "title": "Add AC-03's \"signed in to existing account\" state to SCR-03",
+      "layer": "ui",
+      "deps": [],
+      "acs": [
+        "AC-03"
+      ],
+      "dod": "screens.md documents the SCR-03 linked-account state, DashboardScreen renders it when the session resolved to a pre-existing row matched by email, and a component test asserts the message",
+      "files_hint": [
+        "docs/features/auth-user-plus-dashboard/screens.md",
+        "src/modules/dashboard/ui/DashboardScreen.tsx"
+      ]
+    },
+    {
+      "id": "T25",
+      "title": "Wire the remaining i18n catalog keys through translate() across all screens",
+      "layer": "ui",
+      "deps": [],
+      "acs": [
+        "AC-08"
+      ],
+      "dod": "every user-visible string in LoginScreen, CheckEmailScreen, MagicLinkInvalidScreen, Header and DashboardScreen resolves via translate() from en.json (no hardcoded literals), and dashboard.emptyState matches the shipped copy",
+      "files_hint": [
+        "src/modules/auth/ui/login/LoginScreen.tsx",
+        "src/modules/auth/ui/check-email/CheckEmailScreen.tsx",
+        "src/modules/auth/ui/magic-link-invalid/MagicLinkInvalidScreen.tsx",
+        "src/modules/ui/Header/Header.tsx",
+        "src/modules/dashboard/ui/DashboardScreen.tsx",
+        "src/lib/i18n/en.json"
+      ]
+    },
+    {
+      "id": "T26",
+      "title": "Implement svix-id webhook dedupe",
+      "layer": "infra",
+      "deps": [],
+      "acs": [
+        "AC-01",
+        "AC-03"
+      ],
+      "dod": "the webhook handler persists processed svix-ids and short-circuits a redelivery with the same id to a single upsert; the existing test is corrected to assert exactly one upsert on redelivery",
+      "files_hint": [
+        "src/modules/auth/infra/routes/clerk-webhook.ts",
+        "src/modules/auth/infra/routes/clerk-webhook.test.ts"
+      ]
+    },
+    {
+      "id": "T27",
+      "title": "Add a distinct error code for the webhook email-conflict branch",
+      "layer": "infra",
+      "deps": [
+        "T26"
+      ],
+      "acs": [
+        "AC-03b"
+      ],
+      "dod": "the email-already-linked-to-a-different-account case returns a new auth.email_conflict code (not the reused auth.email_required), documented in contracts/openapi.yaml and covered by a test",
+      "files_hint": [
+        "src/modules/auth/infra/routes/clerk-webhook.ts",
+        "docs/features/auth-user-plus-dashboard/contracts/openapi.yaml"
+      ]
+    },
+    {
+      "id": "T28",
+      "title": "Thread the real requested path through getDashboard's 401 and DashboardContainer",
+      "layer": "app",
+      "deps": [],
+      "acs": [
+        "AC-04",
+        "AC-05"
+      ],
+      "dod": "getDashboard's 401 details.return_to carries the actually-requested path (not a hardcoded constant), DashboardContainer forwards it into the /login redirect, and a .catch branch handles a failed fetch instead of spinning forever",
+      "files_hint": [
+        "src/modules/dashboard/app/get-dashboard.ts",
+        "src/app/api/v1/dashboard/route.ts",
+        "src/modules/dashboard/ui/DashboardContainer.tsx"
+      ]
+    },
+    {
+      "id": "T29",
+      "title": "Guard the Clerk webhook handler against non-user event types",
+      "layer": "infra",
+      "deps": [
+        "T26",
+        "T27"
+      ],
+      "acs": [],
+      "dod": "the handler branches on event.type, 200-and-ignores non-user.created/user.updated events, guards Array.isArray(email_addresses) and a nullable verification entry, and the route wraps the handler body in a try/catch mapping unexpected throws to a 500 in the error envelope",
+      "files_hint": [
+        "src/modules/auth/infra/routes/clerk-webhook.ts",
+        "src/app/webhooks/clerk/route.ts"
+      ]
+    },
+    {
+      "id": "T30",
+      "title": "Introduce AppError and the unified {error:{code,message}} envelope at every route boundary",
+      "layer": "app",
+      "deps": [],
+      "acs": [],
+      "dod": "an AppError base class exists, every API/webhook route maps thrown AppErrors to {error:{code,message}} at its boundary (per CLAUDE.md), and contracts/openapi.yaml's Error schema matches",
+      "files_hint": [
+        "src/lib/errors.ts",
+        "src/app/api/v1/dashboard/route.ts",
+        "src/app/api/v1/auth/logout/route.ts",
+        "src/app/webhooks/clerk/route.ts",
+        "docs/features/auth-user-plus-dashboard/contracts/openapi.yaml"
+      ]
+    },
+    {
+      "id": "T31",
+      "title": "Make the Postgres client a memoized singleton with env validation",
+      "layer": "infra",
+      "deps": [],
+      "acs": [],
+      "dod": "src/db/client.ts allocates one module-level pool reused across requests instead of one per call, and throws fast if DATABASE_URL is unset instead of building a broken client",
+      "files_hint": [
+        "src/db/client.ts"
+      ]
+    },
+    {
+      "id": "T32",
+      "title": "Add a magic-link sign-up fallback for a first-time email",
+      "layer": "ui",
+      "deps": [],
+      "acs": [
+        "AC-02b"
+      ],
+      "dod": "when signIn.create rejects with form_identifier_not_found, LoginContainer falls back to useSignUp() for the magic-link strategy instead of showing the generic sign-in-failed error",
+      "files_hint": [
+        "src/modules/auth/ui/login/LoginContainer.tsx"
+      ]
+    },
+    {
+      "id": "T33",
+      "title": "Replace hand-rolled Svix verification with the Clerk SDK's verifyWebhook helper",
+      "layer": "infra",
+      "deps": [
+        "T29"
+      ],
+      "acs": [],
+      "dod": "the webhook route uses @clerk/nextjs/webhooks' verifyWebhook(request, {signingSecret}) instead of the hand-rolled svix wrapper, keeping an injectable verify seam for tests; the direct svix dependency is dropped if no longer used",
+      "files_hint": [
+        "src/modules/auth/infra/verify-webhook.ts",
+        "src/modules/auth/infra/routes/clerk-webhook.ts",
+        "package.json"
+      ]
+    },
+    {
+      "id": "T34",
+      "title": "Move return-to origin validation into the auth module",
+      "layer": "wiring",
+      "deps": [
+        "T18",
+        "T28"
+      ],
+      "acs": [],
+      "dod": "resolveReturnTo moves from src/modules/dashboard/app/ to src/modules/auth/app/, taking the default destination as a parameter; src/middleware.ts and every caller import it from its new home",
+      "files_hint": [
+        "src/modules/dashboard/app/return-to.ts",
+        "src/modules/auth/app/return-to.ts",
+        "src/middleware.ts"
+      ]
+    },
+    {
+      "id": "T35",
+      "title": "Fix the users migration slot reuse and add the missing db:down runner",
+      "layer": "migration",
+      "deps": [],
+      "acs": [],
+      "dod": "the live migrations tree no longer overwrites an already-applied slot 0 in place (the reset is either reverted to an appended migration or explicitly documented as an intentional reset), and scripts/migrate-down.ts exists so pnpm db:down runs",
+      "files_hint": [
+        "drizzle/",
+        "scripts/migrate-down.ts",
+        "package.json"
+      ]
+    },
+    {
+      "id": "T36",
+      "title": "Register Alert's success variant in the design system inventory",
+      "layer": "docs",
+      "deps": [],
+      "acs": [],
+      "dod": "docs/design-system.md lists Alert's success variant alongside info/error, and the screens.md \"New components\" registration column reflects the components actually registered",
+      "files_hint": [
+        "docs/design-system.md",
+        "docs/features/auth-user-plus-dashboard/screens.md"
+      ]
+    },
+    {
+      "id": "T37",
+      "title": "Replace the skipped e2e stubs with real coverage for the sign-in and return-to paths",
+      "layer": "tests",
+      "deps": [
+        "T18",
+        "T19",
+        "T20",
+        "T21",
+        "T22",
+        "T23"
+      ],
+      "acs": [
+        "AC-01",
+        "AC-04",
+        "AC-05",
+        "AC-07",
+        "AC-08"
+      ],
+      "dod": "e2e/auth-dashboard.spec.ts scenarios have real bodies (not empty test.skip) asserting the sign-up-to-dashboard path, the unauthenticated-dashboard return-to round trip, the fresh-account empty state, and the locale fallback; any scenario still blocked by the lack of a live Clerk instance in this environment is skipped with a named reason, never silently, and CI is not claiming coverage it doesn't have",
+      "files_hint": [
+        "e2e/auth-dashboard.spec.ts"
+      ]
+    },
+    {
+      "id": "T38",
+      "title": "Use Clerk's email-link verification API for magic-link completion, not the OAuth callback handler",
+      "layer": "ui",
+      "deps": [],
+      "acs": [
+        "AC-01",
+        "AC-02",
+        "AC-02b"
+      ],
+      "dod": "SsoCallbackContainer calls clerk.handleEmailLinkVerification (not handleRedirectCallback) on the email-link path, branching from the OAuth path on the presence of email-link query params; invalidity is detected via isEmailLinkError/EmailLinkErrorCodeStatus from @clerk/shared, not invented error-code strings; onVerifiedOnOtherDevice satisfies AC-02b's different-device case; test asserts against the real Clerk error shape, not a hand-authored one",
+      "files_hint": [
+        "src/modules/auth/ui/sso-callback/SsoCallbackContainer.tsx",
+        "src/modules/auth/ui/sso-callback/SsoCallbackContainer.test.tsx"
+      ]
+    },
+    {
+      "id": "T39",
+      "title": "Close the path-traversal bypass in resolveLoginReturnTo (/..//host still resolves off-origin)",
+      "layer": "wiring",
+      "deps": [],
+      "acs": [
+        "AC-04"
+      ],
+      "dod": "resolveLoginReturnTo rejects any resolved pathname that doesn't start with a single '/' (no leading '//' or backslash), falling back to the default dashboard path; return-to.test.ts covers /..//evil.example, //evil.example, /a/../..//evil.example; qg1-security.test.ts drives the untrusted value through LoginPage/SsoCallbackPage's actual render path (not only the pure helper) and fails without the fix",
+      "files_hint": [
+        "src/modules/auth/app/return-to.ts",
+        "src/modules/auth/app/return-to.test.ts",
+        "tests/integration/auth/qg1-security.test.ts",
+        "src/app/login/page.tsx",
+        "src/app/sso-callback/page.tsx"
+      ]
+    },
+    {
+      "id": "T40",
+      "title": "Verify the webhook signature before consulting the dedupe cache",
+      "layer": "infra",
+      "deps": [],
+      "acs": [],
+      "dod": "clerk-webhook.ts checks svix signature verification before any dedupeStore lookup, so an unsigned POST can never read a cached user's id/email; cached value carries no PII (a status marker only); the process-lifetime Map is bounded (TTL or size cap); test proves an unsigned replayed svix-id is rejected, not served from cache",
+      "files_hint": [
+        "src/modules/auth/infra/routes/clerk-webhook.ts",
+        "src/modules/auth/infra/routes/clerk-webhook.test.ts"
+      ]
+    },
+    {
+      "id": "T41",
+      "title": "Persist the second identity on account-linking so the 'linked' banner clears after first render",
+      "layer": "app",
+      "deps": [],
+      "acs": [
+        "AC-03"
+      ],
+      "dod": "a second Clerk identity that links by email gets its own local row (or an equivalent marker) so a repeat getSessionUser(userId) call finds it locally without a Clerk API round-trip and returns linked:false; session.test.ts calls getSessionUser twice with the same linked userId and asserts linked is true then false, with only one Clerk fetch total",
+      "files_hint": [
+        "src/modules/auth/app/session.ts",
+        "src/modules/auth/app/account-linking.ts",
+        "src/modules/auth/app/session.test.ts"
+      ]
+    },
+    {
+      "id": "T42",
+      "title": "Wire SCR-04's i18n strings and add the missing dashboard.errorFetchFailed catalog key",
+      "layer": "ui",
+      "deps": [
+        "T38"
+      ],
+      "acs": [
+        "AC-08"
+      ],
+      "dod": "sso-callback/page.tsx resolves magicLinkInvalid.* via translateAll and passes strings into MagicLinkInvalidScreen; dashboard.errorFetchFailed is added to en.json and to dashboard/page.tsx's stringKeys; a test asserts every en.json key is referenced by at least one page's stringKeys",
+      "files_hint": [
+        "src/app/sso-callback/page.tsx",
+        "src/lib/i18n/en.json",
+        "src/app/dashboard/page.tsx",
+        "src/modules/dashboard/ui/DashboardScreen.tsx"
+      ]
+    },
+    {
+      "id": "T43",
+      "title": "Add the linked field and the webhook's ignored-event response to openapi.yaml",
+      "layer": "docs",
+      "deps": [],
+      "acs": [
+        "AC-01",
+        "AC-03"
+      ],
+      "dod": "contracts/openapi.yaml's DashboardData gains linked:boolean; the webhook's 200 response documents the ignored-event body (a distinct schema or a 204) alongside the User body; both 401 error codes (auth.session_invalid, auth.email_required) are listed on GET /api/v1/dashboard",
+      "files_hint": [
+        "docs/features/auth-user-plus-dashboard/contracts/openapi.yaml"
+      ]
+    },
+    {
+      "id": "T44",
+      "title": "Handle the logout response instead of always redirecting to /login",
+      "layer": "ui",
+      "deps": [],
+      "acs": [
+        "AC-06"
+      ],
+      "dod": "DashboardContainer's handleLogout branches on the response status (204 -> redirect; otherwise -> error state), wraps the fetch in try/catch, and a failing-logout test proves the Traveler is not told they're signed out while the Clerk session is still live",
+      "files_hint": [
+        "src/modules/dashboard/ui/DashboardContainer.tsx",
+        "src/modules/dashboard/ui/DashboardContainer.test.tsx"
+      ]
+    },
+    {
+      "id": "T45",
+      "title": "Fix db:down to actually remove the migration's journal row",
+      "layer": "migration",
+      "deps": [],
+      "acs": [],
+      "dod": "migrate-down.ts targets drizzle's real journal table/schema and the SQL-hash key drizzle actually writes (not a guessed table/tag), so it no longer silently no-ops; a round-trip test (up -> down -> up) proves the users table is restored, run against pglite or a real Postgres instance",
+      "files_hint": [
+        "scripts/migrate-down.ts",
+        "scripts/migrate-up.ts"
+      ]
+    },
+    {
+      "id": "T46",
+      "title": "Give the email-conflict session case its own error code instead of auth.session_invalid",
+      "layer": "app",
+      "deps": [],
+      "acs": [
+        "AC-03b"
+      ],
+      "dod": "getSessionUser returns {authenticated:false, reason:'email_conflict'} when upsertById reports email_conflict during the create-or-fetch fallback; get-dashboard.ts maps it to auth.email_conflict (not auth.session_invalid), the login screen shows the email-conflict copy instead of silently redirect-looping; session.test.ts covers the conflict case",
+      "files_hint": [
+        "src/modules/auth/app/session.ts",
+        "src/modules/dashboard/app/get-dashboard.ts",
+        "src/modules/auth/app/session.test.ts"
+      ]
+    },
+    {
+      "id": "T47",
+      "title": "Wire Clerk's testing-token harness so e2e scenario 3 can actually complete a magic link",
+      "layer": "tests",
+      "deps": [
+        "T38"
+      ],
+      "acs": [
+        "AC-01",
+        "AC-07"
+      ],
+      "dod": "e2e/auth-dashboard.spec.ts's sign-up-to-dashboard scenario retrieves and follows the magic link via @clerk/testing's Playwright harness (or an equivalent testing-token mechanism) when E2E_HAS_LIVE_CLERK is set, instead of waiting on a URL nothing drives it to; if wiring a live Clerk test instance is out of scope for this pass, the scenario's unreachable second half is removed and AC-01/AC-07 e2e coverage is recorded as explicitly uncovered, not claimed done",
+      "files_hint": [
+        "e2e/auth-dashboard.spec.ts",
+        "playwright.config.ts"
+      ]
+    },
+    {
+      "id": "T48",
+      "title": "Fix CheckEmailContainer's resend: preserve return_to, add sign-up fallback, stop mislabeling every failure as rate-limited",
+      "layer": "ui",
+      "deps": [
+        "T38"
+      ],
+      "acs": [
+        "AC-02b",
+        "AC-04"
+      ],
+      "dod": "resend includes ?return_to= the way the initial send does; a form_identifier_not_found rejection falls back to useSignUp the same way LoginContainer does; only a genuine 429/too_many_requests renders error-rate-limited, other failures render a distinct/generic error; CheckEmailContainer.test.tsx covers all three cases",
+      "files_hint": [
+        "src/modules/auth/ui/check-email/CheckEmailContainer.tsx",
+        "src/modules/auth/ui/check-email/CheckEmailContainer.test.tsx",
+        "src/app/check-email/page.tsx"
+      ]
+    },
+    {
+      "id": "T49",
+      "title": "Make SCR-04's 'send new link' actually resend, and reach its loading/rate-limited states",
+      "layer": "ui",
+      "deps": [
+        "T38"
+      ],
+      "acs": [
+        "AC-02"
+      ],
+      "dod": "onSendNewLink re-issues the email-link request (carrying the known email and returnTo) instead of navigating to /login; SsoCallbackContainer drives state to loading during the request and error-rate-limited on a 429, both reachable in a test",
+      "files_hint": [
+        "src/modules/auth/ui/sso-callback/SsoCallbackContainer.tsx",
+        "src/modules/auth/ui/magic-link-invalid/MagicLinkInvalidScreen.tsx"
+      ]
+    },
+    {
+      "id": "T50",
+      "title": "Key the memoized DB client by connection string",
+      "layer": "infra",
+      "deps": [],
+      "acs": [],
+      "dod": "createDbClient caches by connectionString (e.g. a Map) instead of returning the first-created client regardless of argument; client.test.ts asserts two different URLs yield two distinct clients",
+      "files_hint": [
+        "src/db/client.ts",
+        "src/db/client.test.ts"
+      ]
+    },
+    {
+      "id": "T51",
+      "title": "Add SCR-03's fetch-failure error state to screens.md",
+      "layer": "docs",
+      "deps": [],
+      "acs": [
+        "AC-07"
+      ],
+      "dod": "screens.md's SCR-03 entry documents the error state (trigger: dashboard fetch rejected; components: Header, error Alert) instead of listing it N/A, matching the DashboardScreen.tsx state DashboardContainer.tsx already renders",
+      "files_hint": [
+        "docs/features/auth-user-plus-dashboard/screens.md"
+      ]
+    },
+    {
+      "id": "T52",
+      "title": "Verify Clerk middleware coverage for /sso-callback and /check-email",
+      "layer": "wiring",
+      "deps": [],
+      "acs": [],
+      "dod": "confirm against Clerk's docs whether clerkMiddleware must run on /sso-callback and /check-email for the dev-browser/session handshake to complete; if required, add both to the matcher in middleware.ts; if not required, a one-line comment records why /login alone needs it",
+      "files_hint": [
+        "src/middleware.ts"
+      ]
+    },
+    {
+      "id": "T53",
+      "title": "Establish a session on the second device when a magic link is verified there",
+      "layer": "ui",
+      "deps": [],
+      "acs": [
+        "AC-02b"
+      ],
+      "dod": "opening a magic link on a different device/browser than the one that requested it signs in and shows the dashboard on that second device (not a redirect back to /login); Clerk's onVerifiedOnOtherDevice and ClientMismatch outcomes are handled per their actual meaning; the regression test asserts a session is established, not just that router.replace was called",
+      "files_hint": [
+        "src/modules/auth/ui/sso-callback/SsoCallbackContainer.tsx",
+        "src/modules/auth/ui/sso-callback/SsoCallbackContainer.test.tsx"
+      ]
+    },
+    {
+      "id": "T54",
+      "title": "Clear the client-side Clerk session on logout",
+      "layer": "app",
+      "deps": [],
+      "acs": [
+        "AC-06"
+      ],
+      "dod": "logout calls Clerk's client signOut() alongside the existing server-side revoke; a return to /dashboard on the same browser is blocked immediately after logout, not only after the session JWT naturally expires; test asserts client session state is cleared",
+      "files_hint": [
+        "src/modules/dashboard/ui/DashboardContainer.tsx"
+      ]
+    },
+    {
+      "id": "T55",
+      "title": "Persist linked-identity mapping so it survives across instances and restarts",
+      "layer": "data",
+      "deps": [],
+      "acs": [
+        "AC-03"
+      ],
+      "dod": "the second Clerk identity's linked-account resolution is stored in the database (schema + migration), not only in the process-local defaultLinkedIdentities Map; the 'linked' banner and its contract guarantee ('shown once') hold across multiple stateless instances per sad.md \u00a77; the unbounded in-memory map is removed or replaced",
+      "files_hint": [
+        "src/modules/auth/app/session.ts",
+        "docs/features/auth-user-plus-dashboard/data-model.md",
+        "docs/features/auth-user-plus-dashboard/migrations/"
+      ]
+    },
+    {
+      "id": "T56",
+      "title": "Fix openapi.yaml and screens.md drift found in review round 3",
+      "layer": "docs",
+      "deps": [],
+      "acs": [
+        "AC-03b"
+      ],
+      "dod": "openapi.yaml's dashboard 401 documents auth.email_conflict with an example; the dashboard 200 example includes the linked field; ClerkWebhookEvent's type enum no longer contradicts the ignored-event example; screens.md adds SCR-01's error-email-conflict row and SCR-02's error-sign-in-failed row",
+      "files_hint": [
+        "docs/features/auth-user-plus-dashboard/contracts/openapi.yaml",
+        "docs/features/auth-user-plus-dashboard/screens.md"
+      ]
+    },
+    {
+      "id": "T57",
+      "title": "Give SCR-04's resend a sign-up fallback and a visible failure state",
+      "layer": "ui",
+      "deps": [],
+      "acs": [
+        "AC-02"
+      ],
+      "dod": "SCR-04's 'send new link' falls back to sign-up creation on form_identifier_not_found, mirroring CheckEmailContainer/LoginContainer; a non-429 resend failure renders a visible error-sign-in-failed state instead of silently reverting to default; screens.md documents the new state",
+      "files_hint": [
+        "src/modules/auth/ui/sso-callback/SsoCallbackContainer.tsx",
+        "src/modules/auth/ui/magic-link-invalid/MagicLinkInvalidScreen.tsx",
+        "docs/features/auth-user-plus-dashboard/screens.md"
+      ]
+    },
+    {
+      "id": "T58",
+      "title": "Give a failed logout its own error message instead of the dashboard-fetch-failed copy",
+      "layer": "ui",
+      "deps": [],
+      "acs": [],
+      "dod": "a 401/500 from the logout endpoint renders a distinct dashboard.errorLogoutFailed message, not errorFetchFailed; existing DashboardContainer tests are updated to assert the correct copy",
+      "files_hint": [
+        "src/modules/dashboard/ui/DashboardContainer.tsx",
+        "src/modules/dashboard/ui/DashboardScreen.tsx"
+      ]
+    },
+    {
+      "id": "T59",
+      "title": "Make the migrate-down test exercise the real script instead of reimplementing its SQL",
+      "layer": "tests",
+      "deps": [],
+      "acs": [],
+      "dod": "tests/integration/migrations/migrate-down.test.ts calls an exported revert step from scripts/migrate-down.ts rather than inlining the DELETE statement; reverting migrate-down.ts's table/key breaks this test",
+      "files_hint": [
+        "scripts/migrate-down.ts",
+        "tests/integration/migrations/migrate-down.test.ts"
+      ]
+    },
+    {
+      "id": "T60",
+      "title": "Actually deliver AC-02b's outcome via originating-device polling (decision: keep AC-02b as written)",
+      "layer": "ui",
+      "deps": [],
+      "acs": [
+        "AC-02b"
+      ],
+      "dod": "round-4 review resolved the AC-02b fork as (a) poll + complete on the originating device, keeping AC-02b's current wording. CheckEmailContainer/the /check-email page uses Clerk's signIn.createEmailLinkFlow()/startEmailLinkFlow() (or equivalent) to long-poll the sign-in attempt it created, so opening the link on a second device completes the sign-in and navigates the ORIGINATING device to the dashboard (or validated return_to) once Clerk reports verified; the second device (where onVerifiedOnOtherDevice/ClientMismatch fire) renders a distinct, truthful state \u2014 e.g. 'verified-on-other-device', 'you're signed in on your other device' \u2014 with no 'send new link' CTA that could supersede the completing attempt; screens.md documents the new SCR-02 (polling/verified) and SCR-04 (verified-on-other-device) states; ADR-0001's Consequences section gains a note on the email-link cross-device model; test-plan.md:36 gets a real (not just planned) e2e scenario for AC-02b, and e2e/auth-dashboard.spec.ts adds it (or an explicitly-named skip if a live Clerk instance still isn't available, per the existing T47 pattern \u2014 never silently green); SsoCallbackContainer.test.tsx:109-123,249-267 are rewritten to assert the new decided outcome, not the previous deviation",
+      "files_hint": [
+        "src/modules/auth/ui/check-email/CheckEmailContainer.tsx",
+        "src/app/check-email/page.tsx",
+        "src/modules/auth/ui/sso-callback/SsoCallbackContainer.tsx",
+        "src/modules/auth/ui/sso-callback/SsoCallbackContainer.test.tsx",
+        "src/modules/auth/ui/magic-link-invalid/MagicLinkInvalidScreen.tsx",
+        "docs/features/auth-user-plus-dashboard/screens.md",
+        "docs/features/auth-user-plus-dashboard/test-plan.md",
+        "docs/features/auth-user-plus-dashboard/adr/0001-use-clerk-for-passwordless-auth.md",
+        "e2e/auth-dashboard.spec.ts"
+      ]
+    },
+    {
+      "id": "T61",
+      "title": "Stop the logout retry loop when signOut() rejects after the server already revoked the session",
+      "layer": "app",
+      "deps": [],
+      "acs": [
+        "AC-06"
+      ],
+      "dod": "when the server returns 204 but the client-side clerk.signOut() call rejects, the app does not show a retryable 'couldn't sign you out, try again' state that can never succeed (the server session is already gone, so a retried logout 401s); instead it treats the server-confirmed revoke as authoritative (e.g. redirect to /login so the middleware bounces the stale client token) or retries signOut() itself rather than re-POSTing logout; test covers the 204-resolves-but-signOut-rejects case",
+      "files_hint": [
+        "src/modules/dashboard/ui/DashboardContainer.tsx",
+        "src/modules/dashboard/ui/DashboardContainer.test.tsx"
+      ]
+    },
+    {
+      "id": "T62",
+      "title": "Re-validate or invalidate persisted linked-identity mappings instead of trusting them forever",
+      "layer": "data",
+      "deps": [
+        "T55"
+      ],
+      "acs": [
+        "AC-03"
+      ],
+      "dod": "a persisted identity\u2192user mapping in linked_identities is not trusted indefinitely once the underlying Clerk identity's email changes; either the mapping is re-validated against Clerk before use, or it is kept in sync via the user.updated webhook (update/delete path), so a stale mapping cannot permanently attribute one person's identity to another user's account; test covers an identity whose email changed after linking",
+      "files_hint": [
+        "src/modules/auth/app/session.ts",
+        "src/modules/auth/infra/linked-identities-repository.ts",
+        "src/modules/auth/infra/routes/clerk-webhook.ts"
+      ]
+    },
+    {
+      "id": "T63",
+      "title": "Join-test AC-03's linked-banner wire from the dashboard API response to the rendered banner",
+      "layer": "tests",
+      "deps": [],
+      "acs": [
+        "AC-03"
+      ],
+      "dod": "at least one DashboardContainer test's fetch fixture sets linked:true in the response body and asserts the 'signed in to your existing account' banner text renders, so a rename or a dropped linked prop between DashboardContainer.tsx:39 and :72 fails the test instead of staying green",
+      "files_hint": [
+        "src/modules/dashboard/ui/DashboardContainer.tsx",
+        "src/modules/dashboard/ui/DashboardContainer.test.tsx"
+      ]
+    },
+    {
+      "id": "T64",
+      "title": "Fix screens.md's AC-02b mis-citation and re-parameterize migrate-down's journal DELETE",
+      "layer": "docs",
+      "deps": [],
+      "acs": [
+        "AC-02"
+      ],
+      "dod": "screens.md:97's SCR-02 error-sign-in-failed row cites AC-02 (resend failure), not AC-02b, matching the parallel SCR-04 row; scripts/migrate-down.ts's deleteJournalRowSql no longer string-interpolates created_at into the SQL text \u2014 either the executor takes a parameterized query (sql, params) so both the CLI and the test keep a parameterized DELETE, or resolveRevertTarget guards Number.isFinite(last.when) before building the statement",
+      "files_hint": [
+        "docs/features/auth-user-plus-dashboard/screens.md",
+        "scripts/migrate-down.ts",
+        "tests/integration/migrations/migrate-down.test.ts"
+      ]
+    },
+    {
+      "id": "T65",
+      "title": "Amend spec/SAD/UX-flows to state AC-02b's originating-device outcome (close round-4's self-contradiction)",
+      "layer": "docs",
+      "deps": [],
+      "acs": [
+        "AC-02b"
+      ],
+      "dod": "spec.md's AC-02b Given/When/Then is reworded to state the sign-in completes and the dashboard is shown on the ORIGINATING device (the one that requested the link), not the device that opened it; sad.md \u00a76 flow 3's second branch is redrawn to match (session established on originating device via poll, opening device shown a truthful verified-elsewhere state); ux-flows.md's US-01 flowchart gains the verified-elsewhere branch and its AC-02b mapping is corrected to point at the originating-device outcome; all three artifacts agree with the shipped code and with each other",
+      "files_hint": [
+        "docs/features/auth-user-plus-dashboard/spec.md",
+        "docs/features/auth-user-plus-dashboard/sad.md",
+        "docs/features/auth-user-plus-dashboard/ux-flows.md"
+      ]
+    },
+    {
+      "id": "T66",
+      "title": "Surface a visible error instead of a silent no-op when the /check-email send guard fails",
+      "layer": "ui",
+      "deps": [
+        "T60"
+      ],
+      "acs": [
+        "AC-01",
+        "AC-02"
+      ],
+      "dod": "CheckEmailContainer's guards (status !== 'needs_first_factor', missing createEmailLinkFlow, no email_link factor with an emailAddressId) no longer leave state at 'default'/'resent-confirmation' while claiming a link was sent; a guard failure drives a visible error-sign-in-failed (or equivalent) state instead; the resend path does not show 'Link resent' before confirming a send was actually initiated; a test reproduces each guard-failure precondition and asserts the visible error state, not silence",
+      "files_hint": [
+        "src/modules/auth/ui/check-email/CheckEmailContainer.tsx",
+        "src/modules/auth/ui/check-email/CheckEmailContainer.test.tsx",
+        "src/modules/auth/ui/check-email/CheckEmailScreen.tsx"
+      ]
+    },
+    {
+      "id": "T67",
+      "title": "Give the sign-up branch's verified-elsewhere screen a non-destructive recovery CTA",
+      "layer": "ui",
+      "deps": [
+        "T60"
+      ],
+      "acs": [
+        "AC-01",
+        "AC-02b"
+      ],
+      "dod": "when a first-time Traveler's sign-up ClientMismatch routes to MagicLinkInvalidScreen's verified-elsewhere state, the screen no longer claims 'you're signed in on your other device' when no session exists anywhere for a sign-up flow, and it is no longer a dead end (no CTA at all); it offers a non-destructive path back (e.g. return to /login) without reintroducing the session-superseding resend that round 4 removed; a test covers the sign-up-branch ClientMismatch case distinctly from the sign-in-branch onVerifiedOnOtherDevice case",
+      "files_hint": [
+        "src/modules/auth/ui/sso-callback/SsoCallbackContainer.tsx",
+        "src/modules/auth/ui/magic-link-invalid/MagicLinkInvalidScreen.tsx",
+        "src/modules/auth/ui/magic-link-invalid/MagicLinkInvalidScreen.test.tsx"
+      ]
+    },
+    {
+      "id": "T68",
+      "title": "Scope linked-identity invalidation to actual email changes and cover the canonical-account side",
+      "layer": "data",
+      "deps": [
+        "T62"
+      ],
+      "acs": [
+        "AC-03"
+      ],
+      "dod": "the webhook no longer calls linkedIdentities.invalidate() on every user.updated event regardless of whether the verified email changed \u2014 it only invalidates when the computed verifiedEmail actually differs from what's on record, so an unrelated profile edit (display name, avatar, metadata) does not re-show the 'linked' banner and does not cost an extra Clerk fetch; invalidate() also clears rows where the CHANGED identity is the canonicalUserId, not only where it's the identityId, so a canonical account's email change also clears mappings that point at it; session.test.ts:117's 'clears the linked banner ... with only one Clerk fetch total' behavior still holds for a same-email update; a test drives the webhook and getSessionUser against the same database to prove the two paths actually meet",
+      "files_hint": [
+        "src/modules/auth/infra/routes/clerk-webhook.ts",
+        "src/modules/auth/infra/linked-identities-repository.ts",
+        "src/modules/auth/infra/linked-identities-repository.test.ts",
+        "src/modules/auth/app/session.ts",
+        "src/modules/auth/app/session.test.ts"
+      ]
+    },
+    {
+      "id": "T69",
+      "title": "Guard the /check-email poll against cancellation/unmount races and remount re-sends",
+      "layer": "ui",
+      "deps": [
+        "T60"
+      ],
+      "acs": [
+        "AC-02b"
+      ],
+      "dod": "CheckEmailContainer's pollForCompletion .then/.catch handlers check a monotonic generation (or per-invocation cancelled flag) before calling setState/setActive/router.replace, so a settlement from a poll that handleResend already cancelled cannot overwrite 'resent-confirmation' with an error, and a settlement after unmount cannot call setState or navigate; the mount effect does not start a fresh startEmailLinkFlow (and therefore does not send a new link) when a poll for the current sign-in attempt is already in flight \u2014 covers refresh/back-navigation/StrictMake double-mount; tests cover a resend racing a stale poll settlement and a remount while a poll is active",
+      "files_hint": [
+        "src/modules/auth/ui/check-email/CheckEmailContainer.tsx",
+        "src/modules/auth/ui/check-email/CheckEmailContainer.test.tsx"
+      ]
+    },
+    {
+      "id": "T70",
+      "title": "Fix CheckEmailContainer tests to match the real Clerk SignInStatus contract and cover the single-send guarantee",
+      "layer": "tests",
+      "deps": [
+        "T60"
+      ],
+      "acs": [
+        "AC-02",
+        "AC-02b"
+      ],
+      "dod": "the test asserting an 'expired' poll outcome no longer mocks signIn.status: 'expired' (not a member of the real SignInStatus union in @clerk/shared); it instead models expiry via firstFactorVerification.status === 'expired' while signIn.status stays 'needs_first_factor', and CheckEmailContainer.tsx reads that field to drive the expired state; needs_second_factor no longer falls into the generic error-sign-in-failed state without being named; a test asserts LoginContainer.tsx and SsoCallbackContainer.tsx call signIn.create/sendMagicLink without the email_link strategy exactly once per attempt (i.e. reverting either file's T60 change fails this test)",
+      "files_hint": [
+        "src/modules/auth/ui/check-email/CheckEmailContainer.tsx",
+        "src/modules/auth/ui/check-email/CheckEmailContainer.test.tsx",
+        "src/modules/auth/ui/login/LoginContainer.test.tsx",
+        "src/modules/auth/ui/sso-callback/SsoCallbackContainer.test.tsx"
+      ]
+    },
+    {
+      "id": "T71",
+      "title": "Retry or force-clear the client session when signOut() rejects after the server's 204",
+      "layer": "app",
+      "deps": [
+        "T61"
+      ],
+      "acs": [
+        "AC-06"
+      ],
+      "dod": "when the server-side logout returns 204 but clerk.signOut() rejects, the app no longer redirects while leaving a live client-side JWT/session \u2014 it retries the client-side signOut (not the server logout call, which now 401s) or force-clears the session cookie client-side before redirecting, so /dashboard and /api/v1/dashboard cannot still authenticate after a rejected signOut; test covers signOut() rejecting and asserts no live session remains",
+      "files_hint": [
+        "src/modules/dashboard/ui/DashboardContainer.tsx",
+        "src/modules/dashboard/ui/DashboardContainer.test.tsx"
+      ]
+    },
+    {
+      "id": "T72",
+      "title": "Wire the verified-elsewhere screen's strings through the i18n catalog",
+      "layer": "ui",
+      "deps": [
+        "T60"
+      ],
+      "acs": [
+        "AC-08"
+      ],
+      "dod": "verifiedElsewhereHeading/verifiedElsewhereBody are added to src/lib/i18n/en.json under magicLinkInvalid, to src/app/sso-callback/strings.ts's stringKeys, and resolveStrings resolves them per Accept-Language like the other magicLinkInvalid.* keys; MagicLinkInvalidScreen no longer hardcodes the English text for this state",
+      "files_hint": [
+        "src/lib/i18n/en.json",
+        "src/app/sso-callback/strings.ts",
+        "src/modules/auth/ui/magic-link-invalid/MagicLinkInvalidScreen.tsx"
+      ]
+    },
+    {
+      "id": "T73",
+      "title": "Clean up T60/T62 loose ends: dead resend CTA wiring, redundant Clerk import, optional invalidation dependency",
+      "layer": "docs",
+      "deps": [
+        "T60",
+        "T62",
+        "T67"
+      ],
+      "acs": [],
+      "dod": "SsoCallbackContainer no longer passes onSendNewLink into MagicLinkInvalidScreen's verified-elsewhere state now that T67 gives that state its own non-destructive CTA (the resend handle is unreachable, not just unrendered); CheckEmailContainer drops the redundant useClerk import from '@clerk/nextjs' and gets setActive from the existing useSignIn() (legacy) hook instead, narrowing the test's mock surface back down; clerk-webhook's linkedIdentities dependency is a required constructor argument, not optional-typed, so the AC-03 invalidation safety can't be silently dropped by a future caller",
+      "files_hint": [
+        "src/modules/auth/ui/sso-callback/SsoCallbackContainer.tsx",
+        "src/modules/auth/ui/check-email/CheckEmailContainer.tsx",
+        "src/modules/auth/ui/check-email/CheckEmailContainer.test.tsx",
+        "src/modules/auth/infra/routes/clerk-webhook.ts",
+        "src/app/webhooks/clerk/route.ts"
+      ]
+    },
+    {
+      "id": "T74",
+      "title": "Stop T66's guard from firing a false error on the sign-up fallback path into /check-email",
+      "layer": "ui",
+      "deps": [
+        "T66"
+      ],
+      "acs": [
+        "AC-01",
+        "AC-02b"
+      ],
+      "dod": "a magic-link sign-up (LoginContainer's form_identifier_not_found fallback, and the identical SsoCallbackContainer path) marks the arrival at /check-email so the mount-time poll guard skips and the screen stays on the truthful default state instead of rendering error-sign-in-failed; the error-sign-in-failed state (SCR-02) renders the Alert + Resend LinkButton screens.md specifies instead of a dead end; a test drives the real Login/SsoCallback sign-up fallback through to the rendered CheckEmail screen and asserts the default (not error) state",
+      "files_hint": [
+        "src/app/check-email/page.tsx",
+        "src/modules/auth/ui/check-email/CheckEmailContainer.tsx",
+        "src/modules/auth/ui/check-email/CheckEmailContainer.test.tsx",
+        "src/modules/auth/ui/check-email/CheckEmailScreen.tsx",
+        "src/modules/auth/ui/login/LoginContainer.tsx",
+        "src/modules/auth/ui/sso-callback/SsoCallbackContainer.tsx"
+      ]
+    },
+    {
+      "id": "T75",
+      "title": "Close AC-02b's sign-up sub-branch gap in the artifact trio and give the sign-in dead end a CTA",
+      "layer": "docs",
+      "deps": [
+        "T65",
+        "T67"
+      ],
+      "acs": [
+        "AC-02b"
+      ],
+      "dod": "sad.md flow 3 and ux-flows.md's US-01 chart/AC-02b row describe both opening-device outcomes T66/T67 shipped (verified-elsewhere and verified-elsewhere-unconfirmed), not only the sign-in case; spec.md's AC-02b Then is qualified to the sign-in scenario it actually describes; the sign-in branch's verified-elsewhere screen gets the same non-destructive onBackToLogin CTA T67 gave the sign-up branch, and no longer unconditionally asserts a session is established when Clerk's ClientMismatch can fire on stale client identity alone",
+      "files_hint": [
+        "docs/features/auth-user-plus-dashboard/sad.md",
+        "docs/features/auth-user-plus-dashboard/ux-flows.md",
+        "docs/features/auth-user-plus-dashboard/spec.md",
+        "src/modules/auth/ui/magic-link-invalid/MagicLinkInvalidScreen.tsx",
+        "src/modules/auth/ui/sso-callback/SsoCallbackContainer.tsx"
+      ]
+    },
+    {
+      "id": "T76",
+      "title": "Give T71's logout retry real backoff and a genuine force-clear on exhaustion",
+      "layer": "app",
+      "deps": [
+        "T71"
+      ],
+      "acs": [
+        "AC-06"
+      ],
+      "dod": "the client-side signOut retry has a short backoff between attempts instead of firing back-to-back (so a transient blip has a real chance to clear within the retry window); on exhaustion the app force-clears the client session (or surfaces an explicit error-logout-failed state) instead of redirecting with a possibly-live client session; test asserts the exact retry count (toHaveBeenCalledTimes, not a loose > 1 bound) and that no usable session remains after exhaustion",
+      "files_hint": [
+        "src/modules/dashboard/ui/DashboardContainer.tsx",
+        "src/modules/dashboard/ui/DashboardContainer.test.tsx"
+      ]
+    },
+    {
+      "id": "T77",
+      "title": "Don't invalidate linked-identity mappings on a webhook event carrying no verified email",
+      "layer": "data",
+      "deps": [
+        "T68"
+      ],
+      "acs": [
+        "AC-03"
+      ],
+      "dod": "clerk-webhook's ownEmailChanged/noLongerMatchesCanonical invalidation block is gated on verifiedEmail !== null — an event with no verified email address is not evidence the email changed, so it must not wipe linked-identity mappings before the 422 auth.email_required rejection; a webhook test with an existing ownRecord and a payload with no verified email asserts invalidate is NOT called",
+      "files_hint": [
+        "src/modules/auth/infra/routes/clerk-webhook.ts",
+        "src/modules/auth/infra/routes/clerk-webhook.test.ts"
+      ]
+    },
+    {
+      "id": "T78",
+      "title": "Guard /check-email against a superseding remount resend and an unmount-during-resend race",
+      "layer": "ui",
+      "deps": [
+        "T69"
+      ],
+      "acs": [
+        "AC-01",
+        "AC-02"
+      ],
+      "dod": "the mount effect checks the installed @clerk/shared signIn.firstFactorVerification.status/expireAt before calling startEmailLinkFlow again on a refresh/back-nav, so a remount with an outstanding unverified link does not send a fresh superseding one (a deliberate user-initiated resend still re-prepares); a mountedRef guard (or equivalent) makes handleResend's continuation and the pollForCompletion it starts no-op after unmount, so a resend in flight when the component unmounts cannot navigate a torn-down page; spec.md's open question at the T69 send-rate NFR is corrected to reflect the real signal instead of \"no verifiable client-side signal\"",
+      "files_hint": [
+        "src/modules/auth/ui/check-email/CheckEmailContainer.tsx",
+        "src/modules/auth/ui/check-email/CheckEmailContainer.test.tsx",
+        "docs/features/auth-user-plus-dashboard/spec.md"
+      ]
+    }
+  ]
+}
