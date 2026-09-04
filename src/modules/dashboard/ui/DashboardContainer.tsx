@@ -42,6 +42,19 @@ export function DashboardContainer({ strings }: DashboardContainerProps = {}) {
     }
   }, [sessionInvalidError, router]);
 
+  // Clerk's user can go null while this container stays mounted (session revoked from
+  // another device, token-refresh failure, sign-out in another tab). `sessionCleared` is
+  // excluded because handleLogout already owns that redirect. Without this, `enabled` would
+  // stay false forever, no fetch would ever run, and an already-rendered dashboard would be
+  // stuck on the loading spinner instead of AC-03's redirect.
+  const sessionLost = isLoaded && !user && !sessionCleared;
+  useEffect(() => {
+    if (sessionLost) {
+      const path = `${window.location.pathname}${window.location.search}`;
+      router.replace(`/login?return_to=${encodeURIComponent(path)}`);
+    }
+  }, [sessionLost, router]);
+
   // A confirmed invalid session redirects away — never render dashboard data or the
   // generic error state while that navigation is in flight.
   //

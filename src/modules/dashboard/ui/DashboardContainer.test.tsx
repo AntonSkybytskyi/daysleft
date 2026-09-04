@@ -9,7 +9,10 @@ vi.mock("next/navigation", () => ({
 }));
 
 const signOut = vi.fn().mockResolvedValue(undefined);
-const useUserMock = vi.fn(() => ({ user: { id: "u1" }, isLoaded: true }));
+const useUserMock = vi.fn<() => { user: { id: string } | null; isLoaded: boolean }>(() => ({
+  user: { id: "u1" },
+  isLoaded: true,
+}));
 vi.mock("@clerk/nextjs", () => ({
   useClerk: () => ({ signOut }),
   useUser: () => useUserMock(),
@@ -338,6 +341,20 @@ describe("DashboardContainer — TanStack Query migration (T3)", () => {
     );
     expect(screen.queryByText(/nothing tracked yet/i)).not.toBeInTheDocument();
     expect(dashboardQueryModule.dashboardQueryOptions).toHaveBeenCalledWith("u1");
+  });
+
+  it("AC-03: redirects to sign-in, without ever fetching, when Clerk's user goes null on an already-mounted container", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    useUserMock.mockReturnValue({ user: null, isLoaded: true });
+
+    renderDashboard();
+
+    await waitFor(() =>
+      expect(replace).toHaveBeenCalledWith(`/login?return_to=${encodeURIComponent("/")}`),
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(screen.queryByText(/nothing tracked yet/i)).not.toBeInTheDocument();
   });
 
   it("AC-03 vs AC-02: a plain connectivity/server failure does NOT redirect and reaches the error state instead", async () => {
