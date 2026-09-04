@@ -99,7 +99,7 @@ Two scoping notes that every duration/count guarantee below is measured against:
 ### AC-03 (US-04) — authorization
 
 **Given** a Traveler's session has expired or is otherwise invalid
-**When** the Traveler's dashboard summary is actually fetched (the initial load, or any later fetch the Traveler explicitly triggers, e.g. a retry) and that fetch's response carries the confirmed invalid-session signal — not a revisit served from cache with no new fetch, and not any other failure (which falls to AC-02 instead)
+**When** the Traveler's dashboard summary is actually fetched (the initial load, or any later fetch the Traveler explicitly triggers, e.g. a retry) and that fetch's response carries the confirmed invalid-session signal — not a revisit served from cache with no new fetch, and not any other failure (which falls to AC-02 instead) — **or**, without any fetch at all, the client's own auth state (Clerk's `user`) goes null while the dashboard stays mounted (session revoked from another device, a token-refresh failure, sign-out in another tab)
 **Then** the same client-side fetching logic that owns the dashboard's data request sends the Traveler to sign in and reveals no dashboard data, distinguishing this outcome from AC-02's connectivity/server-error case
 
 ### AC-04 (US-06) — domain invariant

@@ -164,6 +164,7 @@ sequenceDiagram
             Web-->>Traveler: redirected to sign-in, no dashboard data shown
         end
     end
+    Note over Web,Clerk: alt — Clerk's user goes null while the dashboard stays mounted<br/>(session revoked elsewhere, refresh failure, sign-out in another tab):<br/>Web redirects to sign-in with no new fetch (AC-03's no-fetch trigger)
 ```
 
 **Critical flow 2: Logout clears the cache for the next Traveler (ADR-0002)**
@@ -235,7 +236,7 @@ Every spec §5 acceptance criterion is shown by a flow or an explicit branch —
 |---|---|
 | AC-01 (happy) | Flow 1, "cache hit" branch |
 | AC-02 (error) | Flow 3, main path |
-| AC-03 (authorization) | Flow 1, "session invalid" branch |
+| AC-03 (authorization) | Flow 1, "session invalid" branch; Flow 1's no-fetch `alt` note (user goes null while mounted) |
 | AC-04 (domain invariant) | Flow 1, success branch (confirmation shown); Flow 3, `alt` branch (confirmation survives a retry) |
 | AC-05 (cross-context) | Flow 2, entire flow |
 | AC-06 (happy — loading state) | Flow 1, cache-miss branch (implicit); Flow 3, explicit loading steps |
