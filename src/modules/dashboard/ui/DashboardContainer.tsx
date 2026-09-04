@@ -4,11 +4,13 @@ import { useClerk, useUser } from "@clerk/nextjs";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { resolveReturnTo } from "@/modules/auth/app/return-to";
 import {
   clearDashboardQuery,
   DashboardSessionInvalidError,
   dashboardQueryOptions,
 } from "@/modules/dashboard/app/dashboard-query";
+import { DASHBOARD_PATH } from "@/modules/dashboard/app/get-dashboard";
 import { DashboardScreen, type DashboardScreenState, type DashboardScreenStrings } from "./DashboardScreen";
 
 export type DashboardContainerProps = {
@@ -51,7 +53,8 @@ export function DashboardContainer({ strings }: DashboardContainerProps = {}) {
   useEffect(() => {
     if (sessionLost) {
       const path = `${window.location.pathname}${window.location.search}`;
-      router.replace(`/login?return_to=${encodeURIComponent(path)}`);
+      const returnTo = resolveReturnTo(path, window.location.origin, DASHBOARD_PATH);
+      router.replace(`/login?return_to=${encodeURIComponent(returnTo)}`);
     }
   }, [sessionLost, router]);
 
