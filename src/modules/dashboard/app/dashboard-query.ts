@@ -1,3 +1,4 @@
+import type { QueryClient } from "@tanstack/react-query";
 import { queryOptions } from "@tanstack/react-query";
 import type { ErrorBody } from "@/lib/errors";
 
@@ -58,4 +59,8 @@ export function dashboardQueryOptions(userId: string) {
     refetchOnReconnect: false,
     retry: false,
   });
+}
+
+export function clearDashboardQuery(queryClient: QueryClient, userId: string) {
+  queryClient.removeQueries({ queryKey: dashboardQueryKey(userId) });
 }

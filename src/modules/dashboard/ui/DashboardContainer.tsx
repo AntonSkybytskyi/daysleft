@@ -1,10 +1,14 @@
 "use client";
 
 import { useClerk, useUser } from "@clerk/nextjs";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { DashboardSessionInvalidError, dashboardQueryOptions } from "@/modules/dashboard/app/dashboard-query";
+import {
+  clearDashboardQuery,
+  DashboardSessionInvalidError,
+  dashboardQueryOptions,
+} from "@/modules/dashboard/app/dashboard-query";
 import { DashboardScreen, type DashboardScreenState, type DashboardScreenStrings } from "./DashboardScreen";
 
 export type DashboardContainerProps = {
@@ -14,12 +18,17 @@ export type DashboardContainerProps = {
 export function DashboardContainer({ strings }: DashboardContainerProps = {}) {
   const router = useRouter();
   const clerk = useClerk();
+  const queryClient = useQueryClient();
   const { user, isLoaded } = useUser();
   // Logout failures are tracked separately from the dashboard query's own status —
   // a failed logout must keep showing its own error regardless of what the query is doing.
   const [status, setStatus] = useState<"idle" | "error-logout-failed">("idle");
+  // Once the server confirms logout, this query must stay disabled even if a later render
+  // (e.g. a failed clerk.signOut() retry surfacing its own error) happens afterward — otherwise
+  // TanStack Query would notice the cache entry we just cleared is gone and auto-refetch it.
+  const [sessionCleared, setSessionCleared] = useState(false);
 
-  const enabled = isLoaded && Boolean(user);
+  const enabled = isLoaded && Boolean(user) && !sessionCleared;
   const query = useQuery({
     ...dashboardQueryOptions(user?.id ?? ""),
     enabled,
@@ -75,6 +84,13 @@ export function DashboardContainer({ strings }: DashboardContainerProps = {}) {
       setStatus("error-logout-failed");
       return;
     }
+    // The server confirmed the session is gone — clear this Traveler's cache entry right away,
+    // independent of whatever happens to the client-side signOut() below, so a next Traveler
+    // signing in on this device never reads a previous Traveler's cached dashboard data.
+    if (user?.id) {
+      clearDashboardQuery(queryClient, user.id);
+    }
+    setSessionCleared(true);
     // The server already revoked the session — that's authoritative, so a rejection here
     // never re-POSTs the logout endpoint (it now 401s with no server session left). Instead
     // retry signOut() itself a bounded number of times, so a transient client-side blip

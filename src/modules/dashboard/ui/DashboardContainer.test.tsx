@@ -9,9 +9,10 @@ vi.mock("next/navigation", () => ({
 }));
 
 const signOut = vi.fn().mockResolvedValue(undefined);
+const useUserMock = vi.fn(() => ({ user: { id: "u1" }, isLoaded: true }));
 vi.mock("@clerk/nextjs", () => ({
   useClerk: () => ({ signOut }),
-  useUser: () => ({ user: { id: "u1" }, isLoaded: true }),
+  useUser: () => useUserMock(),
 }));
 
 vi.mock("@/modules/dashboard/app/dashboard-query", async (importOriginal) => {
@@ -44,6 +45,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
   replace.mockClear();
   signOut.mockClear();
+  useUserMock.mockReset();
+  useUserMock.mockReturnValue({ user: { id: "u1" }, isLoaded: true });
   vi.mocked(dashboardQueryModule.dashboardQueryOptions).mockClear();
 });
 
@@ -437,5 +440,57 @@ describe("DashboardContainer — linked confirmation durability (T5)", () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
 
     expect(screen.queryByText(/signed in to your existing account/i)).not.toBeInTheDocument();
+  });
+});
+
+describe("DashboardContainer — identity-scoped cache clears on logout (T6)", () => {
+  it("AC-05: clears Traveler A's cache entry the instant the logout response confirms server revocation, regardless of clerk.signOut()'s own outcome, and a subsequently-signed-in Traveler B never reads it", async () => {
+    // Shared QueryClient instance across both renders — mirrors sad.md flow 2, where two
+    // Travelers sign in sequentially on the same device (same browser session, same cache).
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    useUserMock.mockReturnValue({ user: { id: "travelerA" }, isLoaded: true });
+    const fetchMockA = vi
+      .fn()
+      .mockResolvedValueOnce(
+        mockFetchResponse(200, { user: { id: "travelerA", email: "a@travel.com" }, has_trips: false, linked: true }),
+      )
+      .mockResolvedValueOnce(mockFetchResponse(204));
+    vi.stubGlobal("fetch", fetchMockA);
+    // The client-side sign-out step fails after the server already confirmed the logout —
+    // AC-05 requires the cache to clear anyway (spec.md edge case list).
+    signOut.mockRejectedValue(new Error("client-side blip"));
+
+    const { unmount } = renderDashboard(client);
+    await waitFor(() => expect(screen.getByText(/signed in to your existing account/i)).toBeInTheDocument());
+    expect(client.getQueryData(dashboardQueryModule.dashboardQueryKey("travelerA"))).toBeDefined();
+
+    await userEvent.click(screen.getByRole("button", { name: "Log out" }));
+
+    // Assert the clear BEFORE anything about clerk.signOut()'s own success/failure — the
+    // clearing must not be conditioned on it.
+    await waitFor(() =>
+      expect(client.getQueryData(dashboardQueryModule.dashboardQueryKey("travelerA"))).toBeUndefined(),
+    );
+
+    unmount();
+
+    // Traveler B signs in on the same device, reusing the same (now stale-for-A) QueryClient.
+    useUserMock.mockReturnValue({ user: { id: "travelerB" }, isLoaded: true });
+    const fetchMockB = vi
+      .fn()
+      .mockResolvedValue(
+        mockFetchResponse(200, { user: { id: "travelerB", email: "b@travel.com" }, has_trips: false, linked: false }),
+      );
+    vi.stubGlobal("fetch", fetchMockB);
+
+    renderDashboard(client);
+
+    // Traveler B's dashboard must fetch fresh — never resolve from an entry left behind by A —
+    // and must never show A's linked confirmation.
+    await waitFor(() => expect(fetchMockB).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByText(/nothing tracked yet/i)).toBeInTheDocument());
+    expect(screen.queryByText(/signed in to your existing account/i)).not.toBeInTheDocument();
+    expect(client.getQueryData(dashboardQueryModule.dashboardQueryKey("travelerA"))).toBeUndefined();
   });
 });
