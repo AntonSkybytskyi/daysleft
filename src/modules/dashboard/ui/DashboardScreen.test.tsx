@@ -5,7 +5,7 @@ import { DashboardScreen } from "./DashboardScreen";
 
 describe("DashboardScreen", () => {
   it("loading: shows the header with logout and a spinner, no empty-state content yet", () => {
-    render(<DashboardScreen state="loading" onLogout={vi.fn()} />);
+    render(<DashboardScreen state="loading" onLogout={vi.fn()} onRetry={vi.fn()} />);
 
     expect(screen.getByRole("button", { name: "Log out" })).toBeInTheDocument();
     expect(screen.getByRole("status")).toBeInTheDocument();
@@ -14,7 +14,7 @@ describe("DashboardScreen", () => {
 
   it("default/empty: shows the header and the empty-state message (has_trips: false)", async () => {
     const onLogout = vi.fn();
-    render(<DashboardScreen state="default" onLogout={onLogout} />);
+    render(<DashboardScreen state="default" onLogout={onLogout} onRetry={vi.fn()} />);
 
     expect(screen.getByText(/nothing tracked yet/i)).toBeInTheDocument();
 
@@ -23,26 +23,26 @@ describe("DashboardScreen", () => {
   });
 
   it("linked-account: tells the Traveler they signed in to their existing account", () => {
-    render(<DashboardScreen state="default" onLogout={vi.fn()} linked />);
+    render(<DashboardScreen state="default" onLogout={vi.fn()} onRetry={vi.fn()} linked />);
 
     expect(screen.getByText(/signed in to your existing account/i)).toBeInTheDocument();
   });
 
   it("does not show the linked-account message for a fresh account", () => {
-    render(<DashboardScreen state="default" onLogout={vi.fn()} />);
+    render(<DashboardScreen state="default" onLogout={vi.fn()} onRetry={vi.fn()} />);
 
     expect(screen.queryByText(/signed in to your existing account/i)).not.toBeInTheDocument();
   });
 
   it("error: shows a fetch-failure message instead of spinning forever", () => {
-    render(<DashboardScreen state="error" onLogout={vi.fn()} />);
+    render(<DashboardScreen state="error" onLogout={vi.fn()} onRetry={vi.fn()} />);
 
     expect(screen.getByRole("alert")).toHaveTextContent(/couldn.t load your dashboard/i);
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
   it("error-logout-failed: shows a logout-specific message, not the dashboard-fetch-failure one", () => {
-    render(<DashboardScreen state="error-logout-failed" onLogout={vi.fn()} />);
+    render(<DashboardScreen state="error-logout-failed" onLogout={vi.fn()} onRetry={vi.fn()} />);
 
     expect(screen.getByRole("alert")).toHaveTextContent(/couldn.t sign you out/i);
   });
@@ -52,6 +52,7 @@ describe("DashboardScreen", () => {
       <DashboardScreen
         state="default"
         onLogout={vi.fn()}
+        onRetry={vi.fn()}
         strings={{ emptyHeading: "Rien à suivre.", logout: "Se déconnecter" }}
       />,
     );

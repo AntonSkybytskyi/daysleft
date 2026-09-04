@@ -1,4 +1,5 @@
 import { Alert } from "@/modules/ui/Alert/Alert";
+import { Button } from "@/modules/ui/Button/Button";
 import { EmptyState } from "@/modules/ui/EmptyState/EmptyState";
 import { Header } from "@/modules/ui/Header/Header";
 import { Spinner } from "@/modules/ui/Spinner/Spinner";
@@ -12,6 +13,7 @@ export type DashboardScreenStrings = {
   logout: string;
   errorFetchFailed: string;
   errorLogoutFailed: string;
+  retry: string;
 };
 
 const defaultStrings: DashboardScreenStrings = {
@@ -21,16 +23,19 @@ const defaultStrings: DashboardScreenStrings = {
   logout: "Log out",
   errorFetchFailed: "Couldn't load your dashboard. Check your connection and try again.",
   errorLogoutFailed: "Couldn't sign you out. You're still signed in — try again.",
+  retry: "Try again",
 };
 
 export type DashboardScreenProps = {
   state: DashboardScreenState;
   onLogout: () => void;
+  onRetry: () => void;
+  isRetrying?: boolean;
   linked?: boolean;
   strings?: Partial<DashboardScreenStrings>;
 };
 
-export function DashboardScreen({ state, onLogout, linked, strings }: DashboardScreenProps) {
+export function DashboardScreen({ state, onLogout, onRetry, isRetrying, linked, strings }: DashboardScreenProps) {
   const t = { ...defaultStrings, ...strings };
   return (
     <div>
@@ -40,7 +45,14 @@ export function DashboardScreen({ state, onLogout, linked, strings }: DashboardS
           <Spinner />
         </div>
       )}
-      {state === "error" && <Alert variant="error">{t.errorFetchFailed}</Alert>}
+      {state === "error" && (
+        <>
+          <Alert variant="error">{t.errorFetchFailed}</Alert>
+          <Button onClick={onRetry} loading={isRetrying} disabled={isRetrying}>
+            {t.retry}
+          </Button>
+        </>
+      )}
       {state === "error-logout-failed" && <Alert variant="error">{t.errorLogoutFailed}</Alert>}
       {state === "default" && (
         <>

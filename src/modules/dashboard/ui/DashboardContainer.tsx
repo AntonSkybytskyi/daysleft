@@ -35,8 +35,19 @@ export function DashboardContainer({ strings }: DashboardContainerProps = {}) {
 
   // A confirmed invalid session redirects away — never render dashboard data or the
   // generic error state while that navigation is in flight.
-  const dashboardStatus: DashboardScreenState =
-    !enabled || query.isPending || sessionInvalidError ? "loading" : query.isError ? "error" : "default";
+  //
+  // A retry re-fetch of a query with no cached data resets TanStack Query's `status` back to
+  // "pending" for its duration (query.js's fetchState clears status/error when data is
+  // undefined), so `isPending`/`isError` alone can't tell a first-ever load apart from a retry
+  // in flight. `errorUpdateCount` persists across that reset, so it's what keeps the error +
+  // retry button on screen (instead of falling back to the full-page spinner) while retrying.
+  const dashboardStatus: DashboardScreenState = !enabled || sessionInvalidError
+    ? "loading"
+    : query.isSuccess
+      ? "default"
+      : query.isError || query.errorUpdateCount > 0
+        ? "error"
+        : "loading";
 
   const renderStatus: DashboardScreenState = status === "error-logout-failed" ? status : dashboardStatus;
   const linked = query.data?.linked ?? false;
@@ -81,5 +92,14 @@ export function DashboardContainer({ strings }: DashboardContainerProps = {}) {
     setStatus("error-logout-failed");
   };
 
-  return <DashboardScreen state={renderStatus} onLogout={handleLogout} linked={linked} strings={strings} />;
+  return (
+    <DashboardScreen
+      state={renderStatus}
+      onLogout={handleLogout}
+      onRetry={() => query.refetch()}
+      isRetrying={query.isFetching}
+      linked={linked}
+      strings={strings}
+    />
+  );
 }

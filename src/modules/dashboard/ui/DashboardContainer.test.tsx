@@ -346,4 +346,51 @@ describe("DashboardContainer — TanStack Query migration (T3)", () => {
     expect(replace).not.toHaveBeenCalled();
     expect(dashboardQueryModule.dashboardQueryOptions).toHaveBeenCalledWith("u1");
   });
+
+  it("AC-02: a non-session fetch failure shows exactly one retry Button, and fires no automatic retry", async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new Error("network down"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderDashboard();
+
+    await screen.findByRole("alert");
+    const retryButtons = screen.getAllByRole("button", { name: /try again/i });
+    expect(retryButtons).toHaveLength(1);
+
+    // No automatic retry: the failure was the query's only fetch, and the count stays
+    // put with nothing further pending (retry:false at the query layer, per AC-02).
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+  });
+
+  it("AC-02: clicking the retry Button re-issues exactly one fetch and shows the Button's own loading state while it's in flight", async () => {
+    let resolveRetry!: (value: unknown) => void;
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("network down"))
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveRetry = resolve;
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderDashboard();
+
+    await screen.findByRole("alert");
+    const retryButton = screen.getByRole("button", { name: /try again/i });
+
+    await userEvent.click(retryButton);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // In-flight retry: no screen-level state change — the same error Alert/Button are
+    // still rendered, only the Button itself reflects the pending request.
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /try again/i })).toBeDisabled();
+
+    resolveRetry(mockFetchResponse(200, { user: { id: "u1", email: "a@b.com" }, has_trips: false }));
+
+    await waitFor(() => expect(screen.getByText(/nothing tracked yet/i)).toBeInTheDocument());
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
 });
