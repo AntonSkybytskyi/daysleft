@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { describe, expect, it } from "vitest";
 
 import { Providers } from "./providers";
@@ -26,9 +27,12 @@ describe("Providers", () => {
     await waitFor(() => expect(screen.getByText("ok")).toBeInTheDocument());
   });
 
-  it("gives each Providers instance its own QueryClient, not one shared across renders (F3: server-render safety)", () => {
+  it("gives each Providers instance its own QueryClient, not one shared across renders", () => {
     function ClientIdentity({ onClient }: { onClient: (client: unknown) => void }) {
-      onClient(useQueryClient());
+      const client = useQueryClient();
+      useEffect(() => {
+        onClient(client);
+      }, [client, onClient]);
       return null;
     }
 
