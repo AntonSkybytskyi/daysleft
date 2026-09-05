@@ -371,13 +371,20 @@ No decision was deferred during the Socratic walk, so no row here originates fro
 
 ## 12. Glossary
 
-<!-- 🎯 Why: ⭐ the DOMAIN GLOSSARY that ends arguments a year later («checkpoint — weekly or
-     biweekly? quarter — calendar or fiscal?»).
-     📋 Write: a term / meaning table. Business + technical terms mixed.
-     📌 e.g. «Lesson | a unit inside a course made of blocks (text, video)». -->
+Domain terms are canonical from `CONTEXT.md` `## Glossary` (repo-root; no feature-scoped `CONTEXT.md` exists for this feature). The technical terms below are introduced by this SAD.
 
 | Term | Meaning |
 |---|---|
-| <e.g. domain object A> | <its meaning in this domain> |
-| <e.g. domain object B> | <its meaning> |
-| <e.g. domain invariant name> | <the rule, in plain language> |
+| Traveler | A person who signs up to track their own visa day-counts and plan visa runs; one account is one Traveler, with no multi-user or organisation concept. NOT an admin or staff role — no internal or operator role exists in this app. |
+| Tracked destination | A record a Traveler creates naming one entry from the destination catalogue that they want to keep track of. A Traveler may hold several for the same country, and each will later carry its own visa type and dates. NOT a destination catalogue entry, which is shared by every Traveler, and NOT a trip or stay, which has dates. |
+| Destination catalogue | The fixed set of countries and zones the app supports — five this pass (Schengen, Thailand, Vietnam, Malaysia, Indonesia) — defined in the codebase and identical for every Traveler. In this SAD it is a frozen constant compiled into both containers, not a table and not a container (ADR-0006). |
+| Detail view | The view of a single tracked destination, reached by opening it from the list and addressable in its own right so it can be reloaded, bookmarked and returned to. NOT a pane that swaps in place without its own address — that addressability is what the reload, bookmark and not-yours guarantees rest on. |
+| First-run screen | The screen a Traveler with no tracked destinations lands on: a screen of its own, with no list beside it, whose single action adds their first destination. NOT the empty state of the list view — the list is absent there, not merely empty. Reachable only from a *confirmed* empty read, never from a failed one. |
+| Saved address | The address of a tracked destination's detail view, carrying that destination's identifier, which a Traveler can reload, bookmark or share. In this SAD it is `/dashboard/<trackedDestinationId>` (ADR-0002). NOT remembered client-side state — the open destination is named in the address, which is why an address naming another Traveler's destination is an authorization case, not a display case. |
+| Sign-in session | The period a Traveler is authenticated, bounded by sign-in and sign-out or by the provider's session expiring. For client-side in-memory state such as the query cache, it is additionally bounded by the current page load. NOT a single page load — the underlying authentication outlives a reload; only in-memory state resets. |
+| Destination reference | The permanent identifier of a destination catalogue entry, stored on a tracked destination as a text column. Never reused for anything else and never removed once any Traveler could hold one, so a delisted destination stays fully openable and removable and is simply no longer addable (AC-09, ADR-0006). |
+| Plain home address | `/dashboard` — the list with nothing selected. What a rejected saved address is replaced with, so a reload does not repeat the rejection (AC-06). |
+| Confirmed | Said of a change the system has actually recorded and reported back. The list reflects only confirmed changes: nothing appears or disappears optimistically (ADR-0005). Also said of a read — the first-run screen requires a *confirmed* empty read — and of a sign-out, which is what triggers discarding the cache (ADR-0007). |
+| Overlay surface | Any of the three surfaces this feature opens over the content: the narrow-screen list drawer, the add picker and the removal confirmation. All three share one focus contract through a single `Modal` primitive (ADR-0004). |
+| Blast radius | How painful a decision is to reverse later. The gate deciding which decisions in this SAD became ADRs: irreversible, multi-module, or having legitimate alternatives — two of three. |
+
