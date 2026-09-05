@@ -346,22 +346,28 @@ Each top-3 goal from §1 expanded into a full scenario. Every number is quoted f
 
 ## 11. Risks and technical debt
 
-<!-- 🎯 Why: ⭐ collects EVERYTHING that can break — not only the technical. Without §11 risks get
-     discussed at standups and lost; debt lives only in the head of whoever accepted it.
-     📋 Write: a risk/debt table — severity — mitigation — owner. Accepted debt in its own block.
-     📌 The first risk is often a product risk, not a technical one. That's normal. -->
-
-<!-- Severity literals: Low / Medium / High for regular risks; "Open question" for rows created by
-     a Save-as-OQ resolution during the Socratic walk (see references/socratic.md). -->
+No decision was deferred during the Socratic walk, so no row here originates from a save-as-open-question. The three `Open question` rows are spec §8 items that bind an architectural stage rather than a product choice, carried forward with the owner and due date the spec already assigned them.
 
 | Risk / debt | Severity | Mitigation | Owner |
 |---|---|---|---|
-| <e.g. Worker lag may reach hours during a downstream outage> | Medium | <alert >10 min, on-call playbook, retry backoff> | <DevOps> |
-| <e.g. No event-schema versioning in v1> | Medium | <ADR-NNNN planned for v2, tolerate unknown fields> | <Backend> |
-| Open architectural decision: <decision-headline> | Open question | Resolve before <stage trigger or YYYY-MM-DD>; <inline rationale from the Save-as-OQ> | <owner> |
+| The app shell may not ship first, or may ship without a header slot a page can place a navigation control into. AC-12's narrow-screen list control has nowhere to live, and the header, logout and linked-account confirmation this SAD assumes away are still inside `src/modules/dashboard/`. | High | Spec §1 names the slot as the single requirement this feature places on the shell, and whoever specifies the shell reads it as an input. Confirm the slot exists before starting `tasks`; if it does not, this feature blocks rather than re-absorbing the shell. | Tech Lead |
+| Hand-rolled focus trapping (ADR-0004) is where QG-2 rests, and its classic defects — shift-tab wrapping at the first focusable element, ordering when one surface opens over another, restoring focus to a control that has since unmounted — are subtle enough to pass a component test. The jsdom accessibility check cannot see real focus order or computed contrast. | Medium | **Accepted with no additional mitigation, deliberately.** The evidence is what §10 QG-2 already commits to: component-test assertions on focus movement for all three surfaces plus `axe-core` at the serious-and-critical floor. A real-browser check was considered and declined this pass. | Tech Lead |
+| The ordering rule exists in two implementations — the server's read query and the client's cache splice (ADR-0005) — and they can drift, producing a list that is ordered one way on first load and another after an add. | Medium | The rule is stated once in §8 and both implementations cite it. A test that adds a record and asserts the spliced list matches a freshly read one would close it; §10 QG-3's assertions cover the confirmed-state property but not this equivalence. | Tech Lead |
+| AC-02's refusal of an unsupported destination reference is enforced in application code, not by the database (ADR-0006). A future write path that skips the app layer would store a reference the catalogue does not contain. | Medium | §10 QG-1 tests the refusal at the app-layer boundary, bypassing the picker, so the guarantee is asserted where it lives. `CLAUDE.md`'s rule that no raw SQL exists outside `src/db/` keeps the number of possible write paths at one. | Tech Lead |
+| Nothing is observable in production. Every §6 target is verified by a single timed run in the test suite and nowhere else; no error rate, no latency, no failure signal exists. The first indication that reads are failing or writes are slow is a Traveler noticing. | Medium | Accepted this pass by spec §3, which excludes analytics, telemetry and production timing on the grounds that choosing a measurement path for a product holding travel data is its own decision. §7 states the consequence explicitly so it is not discovered later. | PM (spec §8, due before public launch) |
+| `docs/architecture-map.md` is stale and actively misleading: it reflects commit `53d3d41`, states that no code exists yet, names Auth.js as the identity provider where the app uses Clerk, and describes a server-actions data approach that neither shipped feature follows. A reader trusting it would design against a system that does not exist. | Medium | This SAD's §2, §3 and §5 are written from the repository at HEAD and supersede the map for this feature. Re-run `/sdd:survey` in brownfield mode to refresh it. | Tech Lead |
+| A UUIDv7 identifier embeds a millisecond creation timestamp, so anyone holding a saved address learns when that tracked destination was created (ADR-0009). | Low | Accepted. The address is already the owner's to hold or share, and it discloses nothing the address does not. Adding a separate opaque public identifier remains additive if that changes. | Tech Lead |
+| `queryClient.clear()` (ADR-0007) supersedes the shipped `clearDashboardQuery` named-key pattern, leaving two ways to do the same thing and a weaker one still in the tree. | Low | Retire `clearDashboardQuery` when this feature lands rather than leaving both patterns for the next feature to choose between. | Tech Lead |
+| Open architectural decision: should a Traveler's tracked set be capped? | Open question | Resolve before `/sdd:data-model`. Default now: no cap — repeated records are legitimate by design, and §6 requires the list to stay operable at 500 entries, so the blast radius is the Traveler's own account. | Tech Lead |
+| Open architectural decision: when does offline creation — and offline reading — of tracked destinations arrive, given the app is described as offline-first and this pass is online-only in both directions? | Open question | Resolve when the sync feature is designed. Default now: online-only; a failed read or add surfaces as AC-11's recoverable error. ADR-0001's HTTP surface is what a sync layer would reconcile against. | Tech Lead |
+| Open architectural decision: is "tracked destination" still the right primitive once trips exist, or should the model move to a permission-to-stay the Traveler holds? | Open question | Resolve before `/sdd:design` of the visa-type-and-dates feature. Default now: unresolved; the strategic review flagged permission-to-stay as the model that dissolves the problem. Every §5 building block assumes the current primitive. | Tech Lead |
 
 **Accepted debt (acceptable in v1, plan to fix later):**
-- <e.g. the entity is immutable / unversioned — OK for v1, may need audit versioning in v2>
+
+- **Two modules cover one screen** — `dashboard` composes the page and `destinations` fills it (ADR-0003), and `/api/v1/dashboard` remains, returning a `has_trips` flag nothing in this feature reads. Retiring the dashboard module is a mechanical move once the shell has settled.
+- **`/dashboard` names a screen where the domain says tracked destinations** (ADR-0002). Renaming is a redirect and a matcher edit, cheap while the product is pre-launch and no real bookmark exists to break.
+- **The offline-first baseline is not met** — reads as well as writes require the network, against a project baseline that calls the app offline-first. Deliberate (spec §3): the offline write path's conflict strategy belongs to the sync feature's own decision record, not to this one.
+- **No `domain` layer in the new module** — a tracked destination holds a reference and a creation time, so there is no behaviour to put in one. The layer arrives with visa types, dates and the rules engine.
 
 ## 12. Glossary
 
