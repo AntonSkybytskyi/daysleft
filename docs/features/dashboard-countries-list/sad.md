@@ -109,19 +109,21 @@ C4Context
 
 ## 4. Solution strategy
 
-<!-- 🎯 Why: the 3–4 STRATEGIC PILLARS every ADR grows from. Without §4 each ADR looks random —
-     there's no umbrella. ⭐ The densest section — the blast-radius gate fires almost always here
-     (decisions are irreversible + multi-module).
-     📋 Write: 3–4 choices; each a heading + 2–3 sentences of rationale.
-     📌 «Store content as a table of typed blocks» is a pillar — ADR-0001 grows from it. -->
-
 **Top strategic choices (the seeds for ADRs):**
 
-1. **<e.g. Module isolation through events>** — <2–3 sentences citing quality goals + constraints>.
-2. **<e.g. Single-store persistence>** — <2–3 sentences>.
-3. **<e.g. Server-rendered read side>** — <2–3 sentences>.
+1. **Serve the list over an HTTP API consumed by TanStack Query** — the browser reaches tracked destinations through `/api/v1/destinations` endpoints, read and mutated through query and mutation hooks, rather than through Server Components and server actions. This is the surface decision: it declares `target_surfaces: [backend-service, web-frontend]`, because an HTTP endpoint is a container distinct from the web app while a server action is not. It reproduces exactly what both shipped features already do (`src/app/api/v1/dashboard/route.ts` + `src/modules/dashboard/app/dashboard-query.ts`), gives the `api` stage a real contract to lock, and leaves the deferred offline-sync feature (spec §8) a server interface to reuse. It also makes AC-11's single recoverable error and AC-14's session-invalid precedence expressible in the one place that already expresses them — the query layer's error path. → **ADR-0001**.
 
-Each tactical decision in later sections should trace to one of these seeds. Tactical decisions that *contradict* a strategic choice are red flags — surface them in §11.
+2. **Name an open tracked destination in a dynamic path segment under the existing home** — `/dashboard/[trackedDestinationId]`, with `/dashboard` as the plain home address AC-06 and AC-07 fall back to. "Saved address" is a glossary term, so this is a shipped guarantee rather than an internal detail: it is what AC-05's reload, AC-06's replacement and AC-13's return-after-sign-in all operate on. The existing narrow-allowlist middleware matcher already covers `/dashboard/:path*` and the shipped `return_to` mechanism already round-trips such a path, so the choice costs no change in the app shell's territory. → **ADR-0002**.
+
+3. **Give the feature its own `destinations` module beside `dashboard`** — `src/modules/destinations/` owns the destination catalogue, the tracked-destination app logic, the query layer and every screen; `src/modules/dashboard/` keeps only what the shell feature leaves it and renders the destinations module in its body. The domain primitives are "tracked destination" and "destination catalogue" (glossary), not "dashboard", and trips and rules will import them by that name. Retiring the dashboard module outright was rejected on sequencing: §2 fixes the shell as shipping first, and two features rewriting one folder in sequence is how a shipped guarantee gets dropped. → **ADR-0003**.
+
+4. **Build one in-repo `Modal` primitive and give all three overlay surfaces the same focus contract through it** — the list drawer, the add picker and the removal confirmation are one behaviour used three times (focus in on open, focus back to the invoking control on close, Escape closes), so the contract lives in a single `src/modules/ui/Modal` rather than being re-implemented per surface. It is hand-rolled with no dependency, matching the eight existing zero-dependency primitives and the `code`-tool design canon. Native `<dialog>` was excluded on evidence, not taste: jsdom 30 in this repo does not implement `showModal`, so §6's required focus assertions would exercise a polyfill instead of shipped behaviour. The correctness risk this carries is accepted and tracked in §11. → **ADR-0004**.
+
+5. **Confirm every write on the server, then splice the confirmed record into the cache** — no optimistic display anywhere (spec §1): a create responds with the tracked destination it recorded and a removal confirms the record it removed, and only then does `onSuccess` update the cached list through `setQueryData`. One round trip keeps §6's 800 ms budget — which is clocked to the *confirmed* state — achievable, while the list still never shows something the system has not recorded. The cost is that the client splice must reproduce the server's ordering rule, so ordering is specified once in §8 and implemented in two places. → **ADR-0005**.
+
+**Bundled convention defaults** (taken from the repository, not decided here): error codes namespaced `destinations.*` under the existing envelope; query key `["destinations", userId]`; `staleTime`/`gcTime` `Infinity` with `retry: false` and no refetch on focus or reconnect — which is already exactly what AC-11 demands, a retry only when the Traveler asks and nothing retrying on its own; copy externalized as `destinations.*` keys in `src/lib/i18n/en.json` and passed as an overridable `strings` prop; the five-entry catalogue defined inside the `destinations` module, since nothing else reads it.
+
+Each tactical decision in later sections traces to one of these seeds. Tactical decisions that *contradict* a strategic choice are red flags — surfaced in §11.
 
 ## 5. Building block view
 
