@@ -264,25 +264,22 @@ The three rejection cases share a single branch by design: the system asks only 
 
 ## 7. Deployment view
 
-<!-- 🎯 Why: the TOPOLOGY DevOps must know without reading the deploy charts — how many replicas,
-     where the background worker lives, AT WHAT NUMBERS we scale.
-     📋 Write: 2–3 sentences on topology + monitoring + concrete threshold numbers.
-     📌 e.g. «500 authors → partition by quarter» (not «we'll think about scale later»).
-     🎯 N/A allowed for XS/S that reuses an existing deployment unit with no change.
-     Deployment-diagram scaffold → templates/deployment.md. -->
+This feature introduces **no new deployment unit**. It ships inside the existing single Next.js application — the web UI and the API routes of §5 are two C4 containers but one deployable — and adds one table to the PostgreSQL instance the app already uses. No hosting target has been chosen for either the app or the database; `docs/architecture-map.md` deliberately leaves it out on the grounds that it does not change the architecture, and that remains true here.
 
-<Topology in 2–3 sentences. Where it runs, replicas, scaling thresholds.>
+The one topological requirement is **ordering**: the `tracked_destinations` migration must be applied before the code that reads it is serving traffic. The repository has `pnpm db:up` and `pnpm db:down` (`scripts/migrate-up.ts` / `migrate-down.ts`) but no deployment pipeline that invokes them, so today this is a manual step and stays one. Because a missing table surfaces as a read failure, the failure mode of getting the order wrong is AC-11's recoverable error rather than data loss — an acceptable outcome for a pre-launch product with one developer, and the reason this is not raised further.
+
+The existing CI workflow (`.github/workflows/ci.yml`) runs `pnpm build`, `pnpm test`, `pnpm lint` and `pnpm test:e2e` on every push to `main` and every pull request, against Node 22 and pnpm 11. That is the only gate this feature passes through, and it is where §10's verification actually runs.
 
 **Monitoring:**
-- <Metrics — e.g. `<metric_name>`>
-- <Alerts — e.g. «worker lag > 10 min → page on-call»>
-- <Tracing — e.g. spans on the request boundary>
+
+- None is added, and none exists. Spec §3 excludes analytics, telemetry, event tracking and production timing measurement, with the reason that choosing a measurement path for a product holding travel data is its own decision rather than a rider on a UI feature. Spec §8 carries that decision with PM as owner, due before public launch.
+- The consequence is stated plainly so it is not discovered later: **every §6 target is verified in the test suite and nowhere else**. Nothing in production will report that the list took longer than 500 ms, that a write exceeded 800 ms, or that reads are failing. The first signal of a problem is a Traveler noticing.
 
 **Scaling thresholds:**
-- <e.g. comfortable in one table up to N rows/year>
-- <e.g. partition by quarter above N rows/year>
 
-<!-- For XS/S with no deployment change: <!-- N/A: reuses existing deployment unit, no infra change --> -->
+- One Traveler's list must stay operable at **500 tracked destinations** (spec §6). Below that ceiling the read returns the whole list unpaginated, which is what ADR-0005's cache splice assumes.
+- Above it, the design would need pagination or virtualization, and ADR-0005's splice would have to become an invalidation. Nothing this pass builds toward that; whether to cap the set at all is a spec §8 open question owned by Tech Lead, due before `/sdd:data-model`.
+- The table's growth is bounded by Travelers × their own list sizes, with no shared contention path and no new load profile (spec §6 marks throughput N/A for exactly this reason). A single unpartitioned table is comfortable well past any pre-launch volume.
 
 ## 8. Crosscutting concepts
 
