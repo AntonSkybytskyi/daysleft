@@ -75,37 +75,36 @@ Responsiveness is a real requirement (spec §6: 500 ms to show the list, 800 ms 
 
 ## 3. Context and scope
 
-<!-- 🎯 Why: draws the SYSTEM BOUNDARY — who talks to it from outside, where the trust zone ends.
-     Without §3, §5 and §8 (authorization) blur — unclear what's «inside» vs «outside».
-     📋 Write: 2–3 sentences of business context + an external-systems table + a C4Context block.
-     📌 «External: none (deliberate, no third-party in v1)» is itself a decision worth stating.
-     Trust boundary — the line past which you don't trust data without checking it.
-     Never N/A — greenfield still draws the planned actors + external systems. -->
+A Traveler signs in and manages a personal, curated list of tracked destinations — adding one from the five destinations the app supports, opening it at its own address, and removing it permanently behind a confirmation. The list is the app's home and its primary navigation. The system holds one new category of personal data (which destinations a Traveler tracks, and when each was added) and exposes no way for one Traveler to read or change another's.
 
-<Business context in 2–3 sentences. What the system does for whom.>
-
-<!-- brownfield: <one-line scan summary> (or «N/A — greenfield repo» if no source existed) -->
+<!-- brownfield: scanned at HEAD e1a1ecc. Real modules: auth (app/infra/ui, Clerk-backed), dashboard (app/ui, header + "Nothing tracked yet." placeholder), ui (8 primitives), sync (Dexie initialized, zero stores). Schema is users + linked_identities only. No dynamic route segment, no overlay/focus-trap primitive, no UUIDv7 helper, no accessibility tooling. docs/architecture-map.md is stale — it predates the auth and query features and names Auth.js. -->
 
 **External systems (in / out):**
 
 | Actor or system | Type | Interaction |
 |---|---|---|
-| <author role> | Person | <what they do> |
-| <external service> | System (internal/external) | <interaction> |
-| <identity provider> | System (external) | <provides auth tokens> |
+| Traveler | Person | Adds, views, opens and removes their own tracked destinations over HTTPS. The only human role — one account is one Traveler; no admin, operator or organisation concept exists. |
+| Clerk | System (external) | Hosted identity provider, already integrated by the shipped auth feature. Answers who the caller is on every read and write of a tracked destination, and is the authority that declares a sign-in invalid (AC-14) or ended (AC-15). |
+| PostgreSQL | System (internal) | The system's own store, not another party. Drawn as a container in §5 rather than an external system here; hosting is deliberately unspecified. |
 
-**C4 Context (L1):** <!-- syntax → references/c4-mermaid-syntax.md. Real names, no <placeholder> stubs. -->
+Nothing else crosses the boundary. There is no analytics or telemetry egress (spec §3), no third-party source for the destination catalogue — it is five entries defined in code (spec §3 excludes Traveler-defined destinations; who owns it and what would move it out of the codebase is spec §8, owned by PM) — and no email or notification path. The **app shell** is inside the system but outside this feature: it ships first, owns the header, logout and the linked-account confirmation, and this feature consumes exactly one thing from it, a header slot for the narrow-screen list control.
+
+**Trust boundary.** Clerk's answer to "who is calling" is the line. Everything on the far side is untrusted, including two inputs that look trustworthy but are not: the destination reference submitted on an add (the picker offers only five, but the criterion in AC-02 is a guarantee the system upholds for *any* request, however it arrives) and the tracked-destination identifier arriving in a URL (AC-06 — it may name another Traveler's record, a removed one, or nothing at all, and all three must be indistinguishable).
+
+**C4 Context (L1):**
 
 ```mermaid
 C4Context
-    title <feature> — System Context
+    title dashboard-countries-list — System Context
 
-    Person(actor, "<Actor role>", "<intent>")
-    System(app, "<Our system>", "<one-sentence description>")
-    System_Ext(ext, "<External system>", "<one-sentence description>")
+    Person(traveler, "Traveler", "Tracks the destinations they need to keep an eye on; one account is one Traveler")
 
-    Rel(actor, app, "<interaction>", "<protocol>")
-    Rel(app, ext, "<interaction>", "<protocol>")
+    System(daysleft, "daysleft", "Next.js web app holding each Traveler's tracked destinations and the destination catalogue")
+
+    System_Ext(clerk, "Clerk", "Hosted identity provider; establishes and invalidates the Traveler's sign-in")
+
+    Rel(traveler, daysleft, "Adds, opens and removes tracked destinations", "HTTPS")
+    Rel(daysleft, clerk, "Establishes who the caller is on every read and write", "HTTPS")
 ```
 
 ## 4. Solution strategy
