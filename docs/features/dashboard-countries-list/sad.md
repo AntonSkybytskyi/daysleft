@@ -194,31 +194,73 @@ The web UI never reaches the database and never decides authorization for itself
 
 ## 6. Runtime view
 
-<!-- 🎯 Why: the RUNTIME FLOW of 1–2 critical scenarios — who talks to whom, when, in what order.
-     Without §6, §5 is just boxes with no life.
-     📋 Write: a Mermaid sequenceDiagram. Participants are names from §5 (don't invent new ones).
-     Messages are semantic («saves a draft»), NO HTTP verbs / paths / status codes — endpoint-level
-     sequences arrive at the `api` stage.
-     📌 e.g. «author → web: composes draft → web → content API: save». Seed the primary flow(s) here;
-     the `sequences` stage then covers every §5 AC (no cap). Never N/A for M+; XS/S keeps ≥1 happy-path flow. -->
+Two flows are seeded here because they fix the runtime shapes every other flow reuses: write-then-confirm-then-splice, and single-path rejection with no early exit on the shape of an identifier. Participants are the §5 containers. Messages are semantic — endpoint-level detail arrives at the `api` stage, and the remaining flows at the `sequences` stage.
 
-**Critical flow 1: <flow name>**
+**Critical flow 1: adding a tracked destination (AC-01, AC-02)**
 
 ```mermaid
 sequenceDiagram
-    actor Actor
-    participant Web
-    participant Service
-    participant Store
-    Actor->>Web: <action>
-    Web->>Service: <call>
-    Service->>Store: <write>
-    Store-->>Service: ok
-    Service-->>Web: result
-    Web-->>Actor: confirmation
+    actor Traveler
+    participant Web as Web UI
+    participant Api as API routes
+    participant Clerk
+    participant Db as Application database
+
+    Traveler->>Web: opens the add picker and chooses a destination
+    Note over Web: nothing is added to the list yet — no optimistic row
+    Web->>Api: asks to record a tracked destination for this catalogue reference
+    Api->>Clerk: establishes who the caller is
+    Clerk-->>Api: the Traveler's identity
+    Api->>Api: checks the reference against the frozen catalogue
+    alt reference is not in the catalogue
+        Api-->>Web: refuses; nothing was recorded
+        Web-->>Traveler: reports that only supported destinations can be tracked
+    else reference is supported
+        Api->>Db: records a new tracked destination owned by this Traveler
+        Db-->>Api: the recorded destination
+        Api-->>Web: confirms, returning the recorded destination
+        Web->>Web: splices the confirmed record into the cached list
+        Web-->>Traveler: shows it in the list and opens its detail view, moving focus there
+    end
 ```
 
-**Critical flow 2: <e.g. async event propagation>** — <if applicable, otherwise N/A>.
+The Traveler may already track the same destination; that is allowed and creates a separate record, so nothing in this flow consults the existing list before recording. The list changes only on the confirming branch — the §6 budget of 800 ms is measured across this whole exchange, which is why it is one round trip (ADR-0005). A failure of the recording step leaves the cache untouched and surfaces the recoverable error of AC-11.
+
+**Critical flow 2: resolving a saved address (AC-05, AC-06, AC-13)**
+
+```mermaid
+sequenceDiagram
+    actor Traveler
+    participant Web as Web UI
+    participant Api as API routes
+    participant Clerk
+    participant Db as Application database
+
+    Traveler->>Web: opens a saved address naming a tracked destination
+    Web->>Api: asks for this Traveler's tracked destinations
+    Api->>Clerk: establishes who the caller is
+    alt no valid sign-in
+        Clerk-->>Api: no identity
+        Api-->>Web: refuses, revealing nothing about any tracked destination
+        Web-->>Traveler: sends them to sign in, remembering the address they wanted
+    else signed in
+        Clerk-->>Api: the Traveler's identity
+        Api->>Db: reads the tracked destinations owned by this Traveler
+        Db-->>Api: the Traveler's own records, in recorded order
+        Api-->>Web: the Traveler's list
+        Web->>Web: looks for the addressed destination among the Traveler's own records
+        alt it is one of theirs
+            Web-->>Traveler: opens that destination's detail view
+        else not theirs, removed, or never existed
+            Note over Web: one path, one outcome — the identifier's shape is never inspected first
+            Web-->>Traveler: selects nothing, replaces the address with the plain home address, and shows one message
+        end
+    end
+```
+
+The three rejection cases share a single branch by design: the system asks only whether the addressed destination is among the ones this Traveler owns, and never asks whether it exists at all. Because the answer is derived from the Traveler's own list rather than from a lookup by identifier, there is no query whose absence of a row could be timed or distinguished, and no malformed-identifier check that could reject early with a different shape of failure.
+
+**The opening read** forks four ways — a confirmed read with records, a confirmed read with none (the only route to the first-run screen), a confirmed invalid sign-in, and every other failure. A confirmed invalid sign-in takes precedence over the recoverable error, and nothing retries on its own before that error is shown. It is drawn in full at the `sequences` stage; its precedence rule is fixed here and in §8.
 
 ## 7. Deployment view
 
