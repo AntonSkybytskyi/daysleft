@@ -1,0 +1,202 @@
+{
+  "slug": "dashboard-countries-list",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Promote the staged tracked_destinations migration and schema",
+      "layer": "migration",
+      "deps": [],
+      "acs": ["AC-01", "AC-02", "AC-03", "AC-06", "AC-08", "AC-09", "AC-17"],
+      "dod": "the tracked_destinations table + idx_tracked_destinations_user_created + FK to users applies and reverts cleanly via pnpm db:up / pnpm db:down",
+      "files_hint": [
+        "docs/features/dashboard-countries-list/migrations/01_create_tracked_destinations.up.sql",
+        "docs/features/dashboard-countries-list/migrations/01_create_tracked_destinations.down.sql",
+        "src/db/schema.ts"
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Add the shared UUIDv7 id-generation helper",
+      "layer": "infra",
+      "deps": [],
+      "acs": ["AC-01"],
+      "dod": "unit tests confirm src/lib/id.ts generates time-sortable UUIDv7 values with no collisions across 10k calls",
+      "files_hint": ["src/lib/id.ts", "src/lib/id.test.ts"]
+    },
+    {
+      "id": "T3",
+      "title": "Add the frozen five-entry destination catalogue",
+      "layer": "app",
+      "deps": [],
+      "acs": ["AC-02", "AC-09"],
+      "dod": "unit tests assert the catalogue exposes exactly the five entries and a lookup that returns false for any reference not in it",
+      "files_hint": ["src/modules/destinations/app/catalogue.ts"]
+    },
+    {
+      "id": "T4",
+      "title": "Add the TrackedDestinationsRepository and its dependency builder",
+      "layer": "infra",
+      "deps": ["T1", "T2"],
+      "acs": ["AC-01", "AC-03", "AC-06", "AC-08", "AC-17"],
+      "dod": "integration tests (pglite) assert insert, ownership-scoped get-by-id (zero rows for another owner), ownership-scoped delete, and list-ordered-by-created_at-then-id all behave as data-model.md specifies",
+      "files_hint": [
+        "src/modules/destinations/infra/tracked-destinations-repository.ts",
+        "src/modules/destinations/infra/destinations-deps.ts"
+      ]
+    },
+    {
+      "id": "T5",
+      "title": "Add the list-tracked-destinations use case",
+      "layer": "app",
+      "deps": ["T4"],
+      "acs": ["AC-03", "AC-07", "AC-10", "AC-11"],
+      "dod": "unit tests assert recorded order (tie-broken by id), a confirmed-empty result distinct from a read failure, and a read failure returns the typed recoverable-error result",
+      "files_hint": ["src/modules/destinations/app/list-tracked-destinations.ts"]
+    },
+    {
+      "id": "T6",
+      "title": "Add the add-tracked-destination use case",
+      "layer": "app",
+      "deps": ["T3", "T4"],
+      "acs": ["AC-01", "AC-02"],
+      "dod": "unit tests assert an unsupported reference is refused with destinations.unsupported_reference and writes nothing (tested at this layer directly, bypassing any picker), and a supported reference records and returns the new row including when a duplicate already exists",
+      "files_hint": ["src/modules/destinations/app/add-tracked-destination.ts"]
+    },
+    {
+      "id": "T7",
+      "title": "Add the remove-tracked-destination use case",
+      "layer": "app",
+      "deps": ["T4"],
+      "acs": ["AC-06", "AC-08", "AC-14", "AC-17"],
+      "dod": "unit tests assert an ownership-scoped delete returns not_found identically for another owner's record, a removed one and a never-existed one, a successful delete confirms, and a delete failure leaves the row intact and returns a distinct not-removed result",
+      "files_hint": ["src/modules/destinations/app/remove-tracked-destination.ts"]
+    },
+    {
+      "id": "T8",
+      "title": "Add the get-tracked-destination-by-id use case",
+      "layer": "app",
+      "deps": ["T4"],
+      "acs": ["AC-05", "AC-06", "AC-16"],
+      "dod": "unit tests assert the ownership-scoped lookup returns the record for its owner and an identical not_found result for another owner's record, a removed one and a never-existed one, executing the same query shape in all three cases",
+      "files_hint": ["src/modules/destinations/app/get-tracked-destination.ts"]
+    },
+    {
+      "id": "T9",
+      "title": "Add GET/POST /api/v1/destinations route handlers",
+      "layer": "ports",
+      "deps": ["T5", "T6"],
+      "acs": ["AC-01", "AC-02", "AC-03", "AC-07", "AC-11", "AC-13"],
+      "dod": "route tests assert 200 with the ordered list, 401 revealing nothing unauthenticated, 201 with the recorded record on POST, 422 destinations.unsupported_reference on an unsupported reference, and every response matches contracts/openapi.yaml",
+      "files_hint": ["src/app/api/v1/destinations/route.ts"]
+    },
+    {
+      "id": "T10",
+      "title": "Add GET/DELETE /api/v1/destinations/{trackedDestinationId} route handlers",
+      "layer": "ports",
+      "deps": ["T7", "T8"],
+      "acs": ["AC-05", "AC-06", "AC-08", "AC-14", "AC-16", "AC-17"],
+      "dod": "route tests assert 200 for the owner, 404 destinations.not_found identically for another owner's/removed/never-existed ids on both GET and DELETE, 204 on confirmed removal, 401 taking precedence on a confirmed invalid sign-in, 500 on an incomplete removal, and every response matches contracts/openapi.yaml",
+      "files_hint": ["src/app/api/v1/destinations/[trackedDestinationId]/route.ts"]
+    },
+    {
+      "id": "T11",
+      "title": "Register the new routes in the middleware allowlist",
+      "layer": "wiring",
+      "deps": ["T9", "T10"],
+      "acs": ["AC-13"],
+      "dod": "a middleware test (or e2e) confirms /api/v1/destinations and /api/v1/destinations/:path* require a valid sign-in and an unauthenticated request is rejected before reaching the route handler",
+      "files_hint": ["src/middleware.ts"]
+    },
+    {
+      "id": "T12",
+      "title": "Build the shared Modal primitive (focus in / focus restore / Escape)",
+      "layer": "ui",
+      "deps": [],
+      "acs": ["AC-12"],
+      "dod": "component tests assert focus moves into the modal on open, returns to the invoking control on close, and Escape closes it; axe-core reports 0 serious/critical violations on the primitive in isolation",
+      "files_hint": ["src/modules/ui/Modal/"]
+    },
+    {
+      "id": "T13",
+      "title": "Add the destinations client query layer (TanStack Query)",
+      "layer": "app",
+      "deps": ["T9", "T10"],
+      "acs": ["AC-11", "AC-14"],
+      "dod": "unit tests assert the query key is [\"destinations\", userId] with staleTime/gcTime Infinity and retry: false, mutations only update the cache in onSuccess via setQueryData (never optimistically), and a session-invalid response is surfaced as a distinct typed error the container routes on",
+      "files_hint": ["src/modules/destinations/app/destinations-query.ts"]
+    },
+    {
+      "id": "T14",
+      "title": "Build DestinationsContainer (query wiring, error and session routing)",
+      "layer": "ui",
+      "deps": ["T13"],
+      "acs": ["AC-11", "AC-13", "AC-14"],
+      "dod": "component tests assert the container renders the loading spinner before the read confirms, routes a confirmed invalid sign-in to sign-in taking precedence over the recoverable-error presentation, and renders the recoverable error on any other read failure",
+      "files_hint": ["src/modules/destinations/ui/DestinationsContainer.tsx"]
+    },
+    {
+      "id": "T15",
+      "title": "Build DestinationList and DestinationListDrawer (SCR-03, SCR-05)",
+      "layer": "ui",
+      "deps": ["T12", "T14"],
+      "acs": ["AC-03", "AC-04", "AC-07", "AC-12"],
+      "dod": "component tests assert rows render in recorded order, the add action is present at every width, the narrow-screen drawer opens itself when nothing is selected on a narrow screen, and axe-core reports 0 serious/critical violations on the drawer; a 500-row fixture test asserts every row stays keyboard-reachable and scrolling stays responsive",
+      "files_hint": [
+        "src/modules/destinations/ui/DestinationList.tsx",
+        "src/modules/destinations/ui/DestinationListDrawer.tsx"
+      ]
+    },
+    {
+      "id": "T16",
+      "title": "Build DestinationPicker (SCR-02, add action)",
+      "layer": "ui",
+      "deps": ["T12", "T14"],
+      "acs": ["AC-01", "AC-02", "AC-04", "AC-12"],
+      "dod": "component tests assert choosing a catalogue entry submits and shows nothing added until the mutation confirms, an unsupported/failed submit shows the inline error without closing, and axe-core reports 0 serious/critical violations",
+      "files_hint": ["src/modules/destinations/ui/DestinationPicker.tsx"]
+    },
+    {
+      "id": "T17",
+      "title": "Build RemoveConfirmation (SCR-06)",
+      "layer": "ui",
+      "deps": ["T12", "T14"],
+      "acs": ["AC-08", "AC-12", "AC-17"],
+      "dod": "component tests assert the destination stays in the list until the removal confirms, a failed removal shows an unambiguous not-removed message while leaving the row intact, and axe-core reports 0 serious/critical violations",
+      "files_hint": ["src/modules/destinations/ui/RemoveConfirmation.tsx"]
+    },
+    {
+      "id": "T18",
+      "title": "Build DestinationDetail, FirstRunScreen and ListUnavailable (SCR-04, SCR-01, SCR-07)",
+      "layer": "ui",
+      "deps": ["T14"],
+      "acs": ["AC-09", "AC-10", "AC-11", "AC-16"],
+      "dod": "component tests assert the detail view states nothing recorded yet for both a current and a delisted destination reference, the first-run screen renders only from a confirmed-empty read, and ListUnavailable renders one presentation with a working retry for every non-auth failure cause",
+      "files_hint": [
+        "src/modules/destinations/ui/DestinationDetail.tsx",
+        "src/modules/destinations/ui/FirstRunScreen.tsx",
+        "src/modules/destinations/ui/ListUnavailable.tsx"
+      ]
+    },
+    {
+      "id": "T19",
+      "title": "Wire the dashboard pages: home and the detail address",
+      "layer": "wiring",
+      "deps": ["T11", "T15", "T16", "T17", "T18"],
+      "acs": ["AC-05", "AC-06", "AC-13"],
+      "dod": "e2e tests assert a reload of a saved detail address reopens the same tracked destination, a not-yours/removed/never-existed address falls back to the plain home address with the one shared message, and an unauthenticated visit to either page redirects to sign-in and returns to the original address after success",
+      "files_hint": [
+        "src/app/dashboard/page.tsx",
+        "src/app/dashboard/[trackedDestinationId]/page.tsx"
+      ]
+    },
+    {
+      "id": "T20",
+      "title": "Add cross-cutting quality verification (ordering equivalence, 500-entry NFR, timings)",
+      "layer": "tests",
+      "deps": ["T19"],
+      "acs": ["AC-03", "AC-12"],
+      "dod": "a test asserts a freshly read list matches the client-spliced list after an add (ordering equivalence, sad.md §11); a single timed test run asserts the list read completes within 500ms and a confirmed add/removal within 800ms against a stubbed network; axe-core runs across all three overlay surfaces together at 0 serious/critical violations",
+      "files_hint": ["e2e/", "src/modules/destinations/"]
+    }
+  ]
+}
