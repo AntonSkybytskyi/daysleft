@@ -283,21 +283,26 @@ The existing CI workflow (`.github/workflows/ci.yml`) runs `pnpm build`, `pnpm t
 
 ## 8. Crosscutting concepts
 
-<!-- 🎯 Why: CROSS-CUTTING PATTERNS spanning several modules: logging, errors, authorization, ID
-     strategy, events, caching. ⭐ The second-densest section. A pattern inside one module is NOT
-     here; a project-wide convention belongs in the convention file.
-     📋 Write: a table — concept / convention / where defined. One row per concept.
-     📌 e.g. «sortable time-based IDs generated in the app layer» as a default from the convention file. -->
-
 | Concept | Convention | Where defined |
 |---|---|---|
-| Logging | <e.g. structured, fields `module=<name>`> | <convention file §X or here> |
-| Authentication | <e.g. token-based via middleware> | <convention file §X> |
-| Error handling | <e.g. domain sentinel → ports error mapping → JSON> | <convention file §X> |
-| ID strategy | <e.g. sortable time-based ID in the app layer> | <convention file §X> |
-| Internationalisation | <e.g. N/A, single language> | — |
-| Observability | <e.g. tracing on the request boundary> | — |
-| Events | <module-specific patterns, if any> | <here> |
+| Authentication | Clerk. Server side: `await auth()` behind an injected `getAuthUserId` dependency, mirroring `buildSessionDeps`. Client side: `useUser()` / `useClerk()` for rendering only — never for an authorization decision. | `src/modules/destinations/infra/destinations-deps.ts`; precedent `src/modules/auth/infra/session-deps.ts:10` |
+| Authorization | Ownership is the only rule: every read and every write is scoped to the caller's own Traveler id in the query itself, never filtered after the fact. There is no role, no sharing and no second principal. | §5 app layer; ADR-0008 |
+| Route protection | Every new page and API route is added to the narrow allowlist in `src/middleware.ts`. `/dashboard/:path*` already covers the detail page; `/api/v1/destinations` and `/api/v1/destinations/:path*` must be added explicitly. | `src/middleware.ts` `config.matcher` |
+| Error handling | Unified envelope `{ error: { code, message } }` via `toErrorEnvelope` / `mapUnknownError`; app-layer functions return typed `{ status, body }` and the route serializes. Codes namespaced `destinations.*`: `destinations.unsupported_reference` (AC-02), `destinations.not_found` (AC-06 / removal). | `src/lib/errors.ts`; §5 app layer |
+| Not-found as authorization | A tracked destination that is not the caller's, one that was removed, and one that never existed are one case with one code, one message and one code path. No branch inspects the shape of an identifier before the ownership-scoped lookup, so there is no early rejection to distinguish. | ADR-0008 |
+| Error precedence | A confirmed invalid sign-in always wins: the client routes to sign-in and stops showing tracked destinations rather than rendering the recoverable error. Every other failure — offline, timeout, unreadable answer, server fault — collapses into one presentation with a Traveler-driven retry. Nothing retries on its own (`retry: false`), and nothing polls in the background for invalidation. | ADR-0001; spec AC-11, AC-14 |
+| Session discard | On a confirmed sign-out the whole query cache is dropped with `queryClient.clear()`, not a list of named keys, so no future resource can leak by forgetting to register. | ADR-0007 |
+| ID strategy | UUIDv7, generated app-side by a new shared `src/lib/id.ts` — this feature is the repository's first consumer of the convention `CLAUDE.md` already mandates. | ADR-0009; `CLAUDE.md` |
+| Ordering | One rule, stated once and implemented twice (server read query, client cache splice): recorded order, most recent last, with the record's own identifier settling ties. UUIDv7's time-sortability makes the tie-break agree with recorded order rather than being arbitrary. | ADR-0005, ADR-0009; spec AC-03 |
+| Overlay focus contract | One `src/modules/ui/Modal` primitive owns it for all three surfaces: focus moves in on open, returns to the invoking control on close, Escape closes. Surfaces never implement it themselves. | ADR-0004; spec AC-12 |
+| Catalogue validation | Every write validates its destination reference against the frozen in-code catalogue before recording anything, at the app-layer boundary rather than in the UI — the refusal is a guarantee for any request, whatever path it arrives by. | ADR-0006; spec AC-02 |
+| Persistence | Drizzle ORM only, no raw SQL outside `src/db/`; access through a `TrackedDestinationsRepository` injected as a dependency, mirroring `UsersRepository`. One `drizzle-kit` migration, forward and down. | `CLAUDE.md`; precedent `src/modules/auth/infra/users-repository.ts` |
+| Client data | TanStack Query. Key `["destinations", userId]`; `staleTime` and `gcTime` `Infinity`, `retry: false`, no refetch on focus or reconnect — which is exactly AC-11's requirement that retries happen only when the Traveler asks. Writes are mutations whose confirmed record is spliced into the cache. | ADR-0001, ADR-0005; precedent `src/modules/dashboard/app/dashboard-query.ts:48` |
+| Internationalisation | Copy externalized as `destinations.*` dot-notation keys in `src/lib/i18n/en.json`, resolved server-side by `translate()` and passed into components as an overridable `strings` prop. Single language; no i18n framework. | `src/lib/i18n/`; precedent `src/app/dashboard/strings.ts` |
+| Logging | Nothing structured exists in the repository and none is added. A server fault reaches the Traveler as AC-11's recoverable error and reaches the developer only through the platform's own output. | — |
+| Observability | N/A this pass — spec §3 excludes analytics, telemetry and production timing; §7 states the consequence that every §6 target is verified in tests and nowhere else. | spec §3, §8 (PM-owned) |
+| Events | N/A — no asynchronous flow, no queue, no background worker. Every operation is a synchronous request the Traveler is waiting on. | — |
+| Offline | N/A this pass, deliberately and against the project's stated offline-first baseline: reads and writes both require the network, and their absence surfaces as AC-11's recoverable error. The Dexie store stays empty. | spec §3, §8 (Tech Lead-owned) |
 
 ## 9. Architecture decisions
 
