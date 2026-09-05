@@ -306,17 +306,21 @@ The existing CI workflow (`.github/workflows/ci.yml`) runs `pnpm build`, `pnpm t
 
 ## 9. Architecture decisions
 
-<!-- 🎯 Why: the REVERSE INDEX onto the adr/ folder. `ls adr/` gives the files; §9 gives the
-     semantics — why they exist, which SAD section they attach to, what status.
-     📋 Write: a 4-column table, one row per ADR. Mixed status is fine.
-     📌 e.g. «0001 | Store content as a table of typed blocks | Accepted | §4». -->
-
 | # | Title | Status | Section |
 |---|---|---|---|
-| <NNNN> | <imperative — e.g. "Use a sliding-window counter for rate limiting"> | Accepted | §<N> |
-| <NNNN> | <imperative — e.g. "Co-locate the worker in the API process"> | Accepted | §<N> |
+| 0001 | Serve tracked destinations over an HTTP API consumed by TanStack Query | Accepted | §4 |
+| 0002 | Address an open tracked destination as a path segment under /dashboard | Accepted | §4 |
+| 0003 | Give the feature its own destinations module beside dashboard | Accepted | §4 |
+| 0004 | Build one in-repo Modal primitive for all three overlay surfaces | Accepted | §4 |
+| 0005 | Confirm writes server-side, then splice the confirmed record into the cache | Accepted | §4 |
+| 0006 | Store the catalogue reference as a validated text column | Accepted | §5 |
+| 0007 | Clear the whole query cache on a confirmed sign-out | Accepted | §8 |
+| 0008 | Answer not-yours, removed and never-existed identically | Accepted | §8 |
+| 0009 | Generate UUIDv7 identifiers app-side in a shared helper | Accepted | §8 |
 
-ADR files live under `docs/features/<slug>/adr/NNNN-<title>.md`.
+ADR files live under `docs/features/dashboard-countries-list/adr/NNNN-<title>.md`.
+
+Decisions taken during the walk that did **not** cross the blast-radius gate, recorded inline instead: the `destinations.*` error-code namespace and the `["destinations", userId]` query key (both mechanical extensions of shipped conventions, §8); the layering of the new module as `ui` / `app` / `infra` with an injected repository (established by `src/modules/auth/`, §5); the catalogue living inside the `destinations` module rather than in a module of its own (§4); and where the accessibility check runs (§10 QG-2) — one criterion only, contained to test tooling.
 
 ## 10. Quality requirements
 

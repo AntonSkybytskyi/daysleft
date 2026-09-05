@@ -34,7 +34,7 @@ ticket: "dashboard-countries-list"
 
 **Chosen:** Option 1. It is the convention already written down, and it is the one that makes AC-03's tie-break meaningful rather than arbitrary — a UUIDv7 tie-break agrees with recorded order, whereas a UUIDv4 tie-break is a stable but meaningless lexical comparison. Its 74 random bits put guessing out of reach, so the §6.1 enumeration case is answered by the identifier's entropy as well as by ADR-0008's uniform response. Option 3 closes a real but narrow leak — the embedded creation timestamp — at the cost of a second column, a second unique index and two identities per record, which is not worth it when the only party who holds the URL is the record's owner.
 
-## Decision drivers accepted as residual risk
+## Residual risk
 
 The identifier embeds a millisecond creation timestamp. Anyone holding a saved address therefore learns when that tracked destination was created. Today that is the owner, or someone the owner shared the address with; it discloses nothing the address itself does not already disclose. Recorded in SAD §11.
 
