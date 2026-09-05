@@ -4,7 +4,7 @@ owner: "Tech Lead"
 reviewers: ["Tech Lead", "Security Lead"]
 updated_at: "2026-09-06"
 feature_size: "M"
-target_surfaces: []  # filled in §4 — subset of: backend-service | web-frontend | mobile-app | desktop-app | cli | worker | library-sdk. Read (never re-derived) by api/sequences/tasks/plan-tests/review → _shared/surfaces.md
+target_surfaces: [backend-service, web-frontend]  # filled in §4 — subset of: backend-service | web-frontend | mobile-app | desktop-app | cli | worker | library-sdk. Read (never re-derived) by api/sequences/tasks/plan-tests/review → _shared/surfaces.md
 ---
 
 # Software Architecture Document — dashboard-countries-list
@@ -127,50 +127,70 @@ Each tactical decision in later sections traces to one of these seeds. Tactical 
 
 ## 5. Building block view
 
-<!-- 🎯 Why: INTERNAL DECOMPOSITION — modules, containers, datastores. The static topology: who
-     may talk to whom. Without §5, §6 (the flows) has no vocabulary of participants.
-     📋 Write: 1 ¶ on the style (layered / hexagonal / clean / event-driven) + a folder tree + a
-     C4Container block.
-     📌 Draw ONE Container per declared `target_surface` (frontmatter): a fullstack
-     [backend-service, web-frontend] = a backend-API container + a web/SPA container; a
-     [backend-service, mobile-app] = the API + the mobile app. The Container(web, …) line below is
-     just one surface's container — swap/add per what was declared in §4. → _shared/surfaces.md
-     📌 e.g. «web app, content API, media worker, datastore, object store, CDN». -->
+The module is **layered feature-first**, matching the shape `src/modules/auth/` already established: `ui` holds React components and containers, `app` holds use-case functions that take an injected dependency object and return a typed `{ status, body }` result, and `infra` holds the Drizzle repository plus the dependency builder that wires it. There is no `domain` layer because there is no behaviour to put in one this pass — a tracked destination holds a destination reference and a creation time and nothing else. Domain logic arrives with visa types, dates and the rules engine, and the layer arrives with it.
 
-<One paragraph: layered / hexagonal / clean / event-driven, and why.>
+The **destination catalogue is a frozen constant**, not a table and not a container: five entries, each a permanent reference plus a display name, compiled into both the API routes (which validate against it) and the web UI (which populates the picker from it). A `tracked_destinations` row stores its catalogue reference as a text column, and the app layer refuses any reference the catalogue does not contain before writing anything. This is what makes AC-09 fall out for free — delisting a destination means removing it from the addable set while every stored reference keeps resolving, so a delisted destination stays fully openable and removable. AC-02's refusal is therefore enforced in code rather than by the database, and it carries its own test (§10) rather than being structurally impossible. → **ADR-0006**.
 
 **Internal decomposition:**
 
 ```
-<e.g. modules/<feature>/>
-├── domain/       <entities + sentinel errors>
-├── app/          <use cases / services>
-├── infra/        <repository + integration impl>
-├── ports/        <handlers, DTOs, error mapping>
-└── wiring        <self-wiring entry point>
+src/modules/destinations/
+├── app/
+│   ├── catalogue.ts                  frozen five-entry catalogue + reference lookup
+│   ├── list-tracked-destinations.ts  use case: read the signed-in Traveler's list
+│   ├── add-tracked-destination.ts    use case: validate the reference, record, return the record
+│   ├── remove-tracked-destination.ts use case: authorize ownership, hard-delete, confirm
+│   └── destinations-query.ts         query key, query options, mutations, typed session-invalid error
+├── infra/
+│   ├── tracked-destinations-repository.ts  Drizzle access, mirroring UsersRepository
+│   └── destinations-deps.ts               buildDestinationsDeps(db), mirroring buildSessionDeps
+└── ui/
+    ├── DestinationsContainer.tsx     client container: query + mutations, error and session routing
+    ├── DestinationList.tsx           the list itself, at both widths
+    ├── DestinationListDrawer.tsx     the narrow-screen overlay wrapping DestinationList
+    ├── DestinationPicker.tsx         the add picker overlay
+    ├── RemoveConfirmation.tsx        the removal confirmation overlay
+    ├── DestinationDetail.tsx         one tracked destination; name + nothing-recorded-yet
+    └── FirstRunScreen.tsx            no list beside it; single add action
+
+src/modules/ui/
+└── Modal/                            new shared primitive: focus in, focus restore, Escape (ADR-0004)
+
+src/app/
+├── dashboard/page.tsx                composed by the dashboard module; renders DestinationsContainer
+├── dashboard/[trackedDestinationId]/page.tsx   the detail address (ADR-0002)
+└── api/v1/destinations/
+    ├── route.ts                      GET list, POST create
+    └── [trackedDestinationId]/route.ts   DELETE
+
+src/db/schema.ts                      + tracked_destinations
+drizzle/                              + one forward migration and its down
+src/lib/id.ts                         new: UUIDv7 generation (first consumer, per CLAUDE.md)
 ```
 
-**C4 Container (L2):** <!-- syntax → references/c4-mermaid-syntax.md. Real names, no <placeholder> stubs. ONE Container per declared target_surface (frontmatter); the web container below is one example surface. -->
+**C4 Container (L2):**
 
 ```mermaid
 C4Container
-    title <feature> — Containers
+    title dashboard-countries-list — Containers
 
-    Person(actor, "<Actor>")
+    Person(traveler, "Traveler", "Manages their own tracked destinations")
 
-    Container_Boundary(app, "<Our system>") {
-        Container(web, "<Web/UI>", "<technology>", "<purpose>")
-        Container(api, "<API/handler>", "<technology>", "<purpose>")
-        ContainerDb(db, "<Datastore>", "<technology>", "<purpose>")
+    Container_Boundary(daysleft, "daysleft") {
+        Container(web, "Web UI", "Next.js App Router, React 18, Tailwind (browser)", "Renders the list, the detail view and the three overlay surfaces; holds the per-Traveler TanStack Query cache")
+        Container(api, "API routes", "Next.js route handlers, Node 22 (server)", "Authorizes every read and write, validates the destination reference against the catalogue, and is the only container that touches the database")
+        ContainerDb(db, "Application database", "PostgreSQL via Drizzle ORM", "users, linked_identities, tracked_destinations")
     }
 
-    System_Ext(ext, "<External>", "<purpose>")
+    System_Ext(clerk, "Clerk", "Hosted identity provider")
 
-    Rel(actor, web, "<interaction>", "<protocol>")
-    Rel(web, api, "<calls>")
-    Rel(api, db, "<reads/writes>", "<driver>")
-    Rel(api, ext, "<emits>", "<protocol>")
+    Rel(traveler, web, "Adds, opens and removes tracked destinations", "HTTPS")
+    Rel(web, api, "Reads the list and submits confirmed writes", "HTTPS / JSON")
+    Rel(api, clerk, "Establishes who the caller is on every request", "HTTPS")
+    Rel(api, db, "Reads and writes tracked destinations", "Drizzle / postgres")
 ```
+
+The web UI never reaches the database and never decides authorization for itself — it reads its own Clerk session only to render, and the answer that matters always comes back through the API. The Dexie local cache (`src/modules/sync/local/db.ts`, currently zero stores) is deliberately absent: spec §3 excludes every offline use of tracked destinations in both directions this pass.
 
 ## 6. Runtime view
 
