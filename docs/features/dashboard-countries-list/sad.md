@@ -324,29 +324,25 @@ Decisions taken during the walk that did **not** cross the blast-radius gate, re
 
 ## 10. Quality requirements
 
-<!-- 🎯 Why: the QUALITY TREE — take a goal from §1 and break it into concrete leaves: tests,
-     metrics, configs, drills. ⭐ Without §10, §1 is a manifesto. With §10 each declaration maps
-     to something PROVABLE.
-     📋 Write: per §1 goal — When / Then / How-verify. Numbers from spec §6 NFR VERBATIM (don't
-     round ≤250ms to ≤300ms — that's a critic F6 hit).
-     📌 e.g. «p95 ≤ 500 ms on a block update, verified by a 100 req/s load test». -->
+Each top-3 goal from §1 expanded into a full scenario. Every number is quoted from spec §6 as written; none is rounded and none is invented. Spec §3 excludes production timing, so every verification below happens in the test suite and nowhere else — §7 states the consequence.
 
-Each top-3 goal from §1 expanded into a full scenario:
+**QG-1. Confidentiality of a Traveler's tracked set**
 
-**QG-1. <quality attribute>**
-- **When:** <trigger condition>
-- **Then:** <expected behaviour with numbers from spec §6 NFR>
-- **How verify:** <test / chaos drill / load test / metric>
+- **When:** a request touches tracked destinations that are not the caller's — a saved address naming another Traveler's record, a removed one or one that never existed; a removal request naming any of those; a create naming a destination reference the catalogue does not contain; or a second Traveler signing in on a device a first Traveler just signed out of.
+- **Then:** every read and every write resolves against the caller's own records only. All three not-yours cases produce one outcome by one path — one `destinations.not_found`, one message, no early rejection on identifier shape and no difference in what the Traveler sees. An unsupported reference is refused with `destinations.unsupported_reference` and nothing is recorded, whatever path the request arrived by. On a confirmed sign-out the whole query cache is cleared, so nothing of the previous Traveler is shown at any point — not even for an instant — before the new Traveler's own list is read. An unauthenticated visitor is sent to sign in and learns nothing: not the number of tracked destinations, not their names, not whether the address named a real one.
+- **How verify:** app-layer tests asserting the ownership scope is in the query rather than applied afterwards; a test asserting the three not-yours cases are indistinguishable in status, code and message; a test that submits an unsupported reference directly to the app layer, bypassing the picker entirely (AC-02 is a guarantee for any request, and ADR-0006 makes it code-enforced rather than database-enforced, so this test is the guarantee); a test asserting `queryClient.clear()` runs on a confirmed sign-out and that a second Traveler's first render shows nothing of the first; an e2e path confirming an unauthenticated visit redirects and reveals nothing. Security review sign-off is required before ship (spec §6.1).
 
-**QG-2. <quality attribute>**
-- **When:** <trigger>
-- **Then:** <expected>
-- **How verify:** <how>
+**QG-2. Keyboard operability and accessibility of the three overlay surfaces**
 
-**QG-3. <quality attribute>**
-- **When:** <trigger>
-- **Then:** <expected>
-- **How verify:** <how>
+- **When:** a Traveler operates the list, the add picker or the removal confirmation by keyboard, at any screen width.
+- **Then:** **0 violations at serious or critical severity** on the list, the add picker and the removal confirmation. Focus enters each of those surfaces on open and returns to its invoking control on close, with Escape closing each. On a narrow screen the list sits behind a control in the app shell's header, opening it moves focus into it, and choosing a destination both opens that destination and closes the list. Separately, the list stays operable at **500 tracked destinations** for one Traveler, where operable means every row is reachable by keyboard, the list renders within the first row's budget, and scrolling stays responsive.
+- **How verify:** an automated accessibility check at the serious-and-critical severity floor, run as `axe-core` inside the Vitest component tests for all three surfaces — this is the main independent evidence that ADR-0004's hand-rolled focus trap is correct, so it is load-bearing rather than a formality. Alongside it, component-test assertions on focus movement for all three surfaces: focus in on open, focus back to the invoking control on close, Escape closes. And a test that builds a 500-entry list and asserts each of those three operability properties. The known limit is recorded rather than glossed: jsdom is not a browser, so this check sees structure and ARIA but not computed contrast or real focus order.
+
+**QG-3. Truthfulness of displayed state**
+
+- **When:** a Traveler adds or removes a tracked destination, or opens the app when the list cannot be read.
+- **Then:** the list changes only after the system has recorded the change, never optimistically ahead of confirmation — a new destination appears once the create is confirmed, and a removed one disappears once the removal is confirmed. A removal that cannot be completed leaves the tracked destination in the list exactly as it was, with one message saying plainly that it was not removed. A read that fails for any reason other than a confirmed invalid sign-in shows one recoverable error, the same presentation whatever the cause, with a retry the Traveler may use as often as they like and nothing retrying on its own beforehand; the first-run screen is never shown in this state. A confirmed invalid sign-in takes precedence over that error. Showing a Traveler's tracked destinations **completes within 500 ms**; adding or removing one completes **within 800 ms** from the Traveler's action to the list reflecting the confirmed result.
+- **How verify:** component tests asserting no row appears or disappears before the mutation resolves, and that a rejected mutation leaves the cached list byte-identical; a test asserting the failed-removal message states unambiguously that the removal did not happen; tests asserting every non-401 failure mode — offline, server fault, timeout, unreadable answer — produces the same error presentation with a Traveler-driven retry, and that no automatic retry precedes it; a test asserting the first-run screen is reachable only from a confirmed empty read; a test asserting a confirmed invalid sign-in wins over the error path. For the two timings, a single timed run in the test suite against a stubbed network, the second clocked from the action to the confirmed list state — matching spec §6's stated measurement exactly, and carrying its stated limitation: these are single runs, not production measurements.
 
 ## 11. Risks and technical debt
 
