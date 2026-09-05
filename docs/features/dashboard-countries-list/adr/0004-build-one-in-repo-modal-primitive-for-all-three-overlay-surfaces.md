@@ -22,7 +22,7 @@ This feature opens three surfaces over the content — the narrow-screen list dr
 - Spec §5 AC-12: the focus-in, focus-return and Escape contract, identical across all three surfaces.
 - Spec §6 NFR: zero accessibility violations at serious or critical severity on the list, the picker and the removal confirmation, **plus component-test assertions on focus movement for all three**.
 - SAD §1 quality goal 2: keyboard operability of the overlay surfaces is a top-3 quality goal.
-- SAD §2: jsdom 30 in this repository does not implement `HTMLDialogElement.showModal` (verified by probe), so anything relying on it is untestable at the component level here.
+- SAD §2 Constraints: jsdom 30.0.1 in this repository does not implement `HTMLDialogElement.showModal` (verified by probe), so anything relying on it is untestable at the component level here.
 - `docs/design-system.md`: tool `code`; the in-repo `src/modules/ui/` components are the library, and every existing primitive is dependency-free.
 
 ## Considered options

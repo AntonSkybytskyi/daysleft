@@ -15,7 +15,7 @@ ticket: "dashboard-countries-list"
 
 ## Context
 
-A tracked destination's identifier appears in its address, which a Traveler can bookmark, reload and share. Spec §6.1 names enumeration through a saved address as an abuse case: an unowned or invented identifier can be probed. Spec §5 AC-06 answers it by requiring that another Traveler's record, one this Traveler removed, and one that never existed all produce the same outcome by the same handling path, with no early rejection based on the shape of the identifier and no difference in what the Traveler sees. The same property must hold for a removal request, which is a server-side write rather than a client-side resolution.
+A tracked destination's identifier appears in its address, which a Traveler can bookmark, reload and share. Spec §6.1 names enumeration through a saved address as an abuse case: an unowned or invented identifier can be probed. Spec §5 AC-06 answers it by requiring that another Traveler's record, one this Traveler removed, and one that never existed all produce the same outcome by the same handling path, with no early rejection based on the shape of the identifier and no difference in what the Traveler sees. The same property must hold for every path that resolves an identifier — reading a destination by its saved address and removing one — so both go through the same server-side lookup rather than one being answered on the client.
 
 ## Decision drivers
 
@@ -26,13 +26,13 @@ A tracked destination's identifier appears in its address, which a Traveler can 
 
 ## Considered options
 
-1. **A single `404` carrying `destinations.not_found`** for every miss, produced by an ownership-scoped lookup.
+1. **A single `404` carrying `destinations.not_found`** for every miss on every path, produced by one ownership-scoped lookup shared by the by-identifier read and the removal.
 2. **`204 No Content` regardless** — treat removal as idempotent, since absent is absent.
 3. **`403` for not-yours and `404` for never-existed** — the conventional HTTP distinction.
 
 ## Decision outcome
 
-**Chosen:** Option 1. The handler asks one question — does a record with this identifier exist *and belong to the caller* — so a miss is a miss for all three reasons, and there is no shape check, format validation or existence probe that could reject earlier or differently. Option 3 is the exact oracle §6.1 describes: the pair of status codes tells a prober which identifiers are real. Option 2 leaks nothing but lets an action that changed nothing report success, which is the failure mode AC-17 and AC-14 are both written to prevent.
+**Chosen:** Option 1. The handler asks one question — does a record with this identifier exist *and belong to the caller* — so a miss is a miss for all three reasons, and there is no shape check, format validation or existence probe that could reject earlier or differently. Because the lookup is ownership-scoped, all three cases return zero rows from the same query executing the same plan, so the indistinguishability is a property of the query rather than of matching two code branches by hand. Option 3 is the exact oracle §6.1 describes: the pair of status codes tells a prober which identifiers are real. Option 2 leaks nothing but lets an action that changed nothing report success, which is the failure mode AC-17 and AC-14 are both written to prevent.
 
 ## Consequences
 
@@ -46,7 +46,7 @@ A tracked destination's identifier appears in its address, which a Traveler can 
 - Debugging is slightly harder: an operator cannot tell from the response which of the three cases occurred.
 
 **Neutral**
-- Reads reach the same outcome by a different mechanism — §6 flow 2 resolves the address against the Traveler's own list rather than by looking the identifier up — so no lookup exists whose absence could be timed.
+- Reads and removals share one mechanism (§6 flow 2), so the guarantee is asserted once against the by-identifier endpoint and holds for both. An earlier draft resolved the address on the client against the Traveler's own list, which avoided having a by-identifier endpoint at all; that was traded for a single verifiable path, and the residual exposure is recorded in SAD §11 as Low.
 
 ## Links
 

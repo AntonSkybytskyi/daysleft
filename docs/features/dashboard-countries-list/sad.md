@@ -9,9 +9,12 @@ target_surfaces: [backend-service, web-frontend]  # filled in §4 — subset of:
 
 # Software Architecture Document — dashboard-countries-list
 
-<!-- 12 Arc42 sections. Empty section → <!-- N/A: <one-line reason> -->. -->
-<!-- C4 Context (L1) lives inline in §3. C4 Container (L2) lives inline in §5. -->
-<!-- Numbers in §10 come VERBATIM from spec.md §6 NFR — no inventing, no rounding. -->
+> Arc42, 12 sections. C4 Context (L1) is inline in §3 and C4 Container (L2) in §5; §6 seeds the
+> runtime flows that the `sequences` stage completes. Every number in §10 is quoted from
+> `spec.md` §6 as written. Decisions that crossed the blast-radius gate are ADRs under `adr/` and
+> indexed in §9; decisions that did not are recorded inline and listed at the end of §9.
+> Written against the repository at HEAD, not against `docs/architecture-map.md`, which is stale
+> (see §11).
 
 ## 1. Introduction and goals
 
@@ -34,7 +37,10 @@ Responsiveness is a real requirement (spec §6: 500 ms to show the list, 800 ms 
 | Security Lead | Mandatory security review (spec §6.1): a new owned resource, a new authorization boundary, a new category of personal data, and an identifier exposed in a shareable address | Yes |
 | PM | Consulted on §10 quality goals and §11 severities; owns the deferred metrics decision and destination-catalogue ownership (spec §8) | No |
 
-<!-- Decision overrides (¶4) — populated by the critic resolution loop, empty otherwise. -->
+**Decision overrides.**
+
+- Decision override: resolving a saved address goes through a by-identifier read endpoint rather than being resolved on the client against the Traveler's own list — rationale: it gives AC-06's indistinguishability one verifiable path shared by reads and removals, so §10 QG-1's test is executable as written. Taken in the critic resolution loop over the alternative of splitting QG-1's claim by path; the residual exposure of having a server oracle at all is recorded in §11 as Low, mitigated by the ownership-scoped query returning zero rows identically in all three cases (ADR-0008).
+- Decision override: the overlay focus contract is hand-rolled rather than taken from a headless library, and carries no mitigation beyond §10 QG-2's component assertions and `axe-core` check — rationale: keeping `src/modules/ui/` dependency-free and consistent with the `code` design canon was preferred to the stronger correctness guarantee. Recorded as accepted risk in §11 (ADR-0004).
 
 ## 2. Constraints
 
@@ -47,14 +53,17 @@ Responsiveness is a real requirement (spec §6: 500 ms to show the list, 800 ms 
 - PostgreSQL via Drizzle ORM 0.33 + `postgres` 3.4; `drizzle-kit` 0.24 for migrations. Existing schema is two tables only: `users`, `linked_identities` (`src/db/schema.ts`).
 - TanStack Query 5.102 for client data. The `QueryClient` is instantiated per render in `src/app/providers.tsx` to avoid cross-Traveler leakage under SSR.
 - Tailwind CSS 3.4 with `tailwind.config.ts` present and unextended — default breakpoints (`sm` 640 / `md` 768 / `lg` 1024 / `xl` 1280). No component library, no headless-UI or Radix dependency.
-- Vitest 2.0 + Testing Library + jsdom for unit and component tests; Playwright 1.46 for e2e; `@electric-sql/pglite` available for database-backed tests. No accessibility-checking tool is wired today.
+- Vitest 2.0 + Testing Library + jsdom 30.0.1 for unit and component tests; Playwright 1.46 for e2e; `@electric-sql/pglite` available for database-backed tests. No accessibility-checking tool is wired today.
+- **jsdom 30.0.1 does not implement `HTMLDialogElement.showModal`** (verified by probe in this repository). Anything relying on the native modal dialog is therefore untestable at the component level here, which is where §6 requires the focus assertions to run.
 
 **Organisational.**
 
 - Team: one developer. No parallelism to exploit, so §4 prefers the smallest reviewable diff over decomposition that only pays off across people.
 - Deadline: none — the product is pre-launch, which is the same reason spec §8 declines to score its priority. Scope, not the calendar, is the binding constraint.
 - Effort budget: not fixed. Anything that would materially grow the change becomes a §11 row rather than silent scope growth.
-- Sequencing constraint (hard): the **app shell feature ships first** (spec §1, §3). This SAD assumes the shell owns the header, the logout action and the one-time linked-account confirmation, and it places exactly one requirement on the shell — a header slot a page can put a navigation control into, which is where the narrow-screen list toggle lives (AC-12).
+- Sequencing constraint (hard): the **app shell feature ships first** (spec §1, §3). This SAD assumes the shell owns the header, the logout action and the one-time linked-account confirmation, and it places **two** requirements on it:
+  1. a header slot a page can put a navigation control into, which is where the narrow-screen list toggle lives (AC-12) — the requirement spec §1 already names;
+  2. that its **confirmed sign-out clears the query cache** (`queryClient.clear()`), which is how AC-15 is met. ADR-0007 deliberately makes this clear app-wide rather than per-resource, so it belongs at the app-wide sign-out point the shell owns rather than inside any one feature. Whoever specifies the shell reads both as inputs.
 
 **Conventions.** Project convention file: `CLAUDE.md`; design canon: `docs/design-system.md`.
 
@@ -87,7 +96,7 @@ A Traveler signs in and manages a personal, curated list of tracked destinations
 | Clerk | System (external) | Hosted identity provider, already integrated by the shipped auth feature. Answers who the caller is on every read and write of a tracked destination, and is the authority that declares a sign-in invalid (AC-14) or ended (AC-15). |
 | PostgreSQL | System (internal) | The system's own store, not another party. Drawn as a container in §5 rather than an external system here; hosting is deliberately unspecified. |
 
-Nothing else crosses the boundary. There is no analytics or telemetry egress (spec §3), no third-party source for the destination catalogue — it is five entries defined in code (spec §3 excludes Traveler-defined destinations; who owns it and what would move it out of the codebase is spec §8, owned by PM) — and no email or notification path. The **app shell** is inside the system but outside this feature: it ships first, owns the header, logout and the linked-account confirmation, and this feature consumes exactly one thing from it, a header slot for the narrow-screen list control.
+Nothing else crosses the boundary. There is no analytics or telemetry egress (spec §3), no third-party source for the destination catalogue — it is five entries defined in code (spec §3 excludes Traveler-defined destinations; who owns it and what would move it out of the codebase is spec §8, owned by PM) — and no email or notification path. The **app shell** is inside the system but outside this feature: it ships first, owns the header, logout and the linked-account confirmation. This feature places two requirements on it (§2): a header slot for the narrow-screen list control, and a confirmed sign-out that clears the query cache, which is what AC-15 rests on.
 
 **Trust boundary.** Clerk's answer to "who is calling" is the line. Everything on the far side is untrusted, including two inputs that look trustworthy but are not: the destination reference submitted on an add (the picker offers only five, but the criterion in AC-02 is a guarantee the system upholds for *any* request, however it arrives) and the tracked-destination identifier arriving in a URL (AC-06 — it may name another Traveler's record, a removed one, or nothing at all, and all three must be indistinguishable).
 
@@ -151,7 +160,8 @@ src/modules/destinations/
     ├── DestinationPicker.tsx         the add picker overlay
     ├── RemoveConfirmation.tsx        the removal confirmation overlay
     ├── DestinationDetail.tsx         one tracked destination; name + nothing-recorded-yet
-    └── FirstRunScreen.tsx            no list beside it; single add action
+    ├── FirstRunScreen.tsx            no list beside it; single add action
+    └── ListUnavailable.tsx           the one recoverable error presentation + Traveler-driven retry
 
 src/modules/ui/
 └── Modal/                            new shared primitive: focus in, focus restore, Escape (ADR-0004)
@@ -161,7 +171,7 @@ src/app/
 ├── dashboard/[trackedDestinationId]/page.tsx   the detail address (ADR-0002)
 └── api/v1/destinations/
     ├── route.ts                      GET list, POST create
-    └── [trackedDestinationId]/route.ts   DELETE
+    └── [trackedDestinationId]/route.ts   GET one, DELETE
 
 src/db/schema.ts                      + tracked_destinations
 drizzle/                              + one forward migration and its down
@@ -189,6 +199,8 @@ C4Container
     Rel(api, clerk, "Establishes who the caller is on every request", "HTTPS")
     Rel(api, db, "Reads and writes tracked destinations", "Drizzle / postgres")
 ```
+
+Every screen in the `ux-flows` inventory has a home here: SCR-01 is `FirstRunScreen`, SCR-02 `DestinationPicker`, SCR-03 `DestinationList` with `DestinationDetail` absent, SCR-04 `DestinationDetail`, SCR-05 `DestinationListDrawer`, SCR-06 `RemoveConfirmation`, SCR-07 `ListUnavailable`. SCR-07 is a component rather than an inline branch deliberately: AC-11 requires the same presentation whatever the cause and it is entered from four different flows, so one component with its own test is what stops that guarantee drifting into four separate branches.
 
 The web UI never reaches the database and never decides authorization for itself — it reads its own Clerk session only to render, and the answer that matters always comes back through the API. The Dexie local cache (`src/modules/sync/local/db.ts`, currently zero stores) is deliberately absent: spec §3 excludes every offline use of tracked destinations in both directions this pass.
 
@@ -237,7 +249,7 @@ sequenceDiagram
     participant Db as Application database
 
     Traveler->>Web: opens a saved address naming a tracked destination
-    Web->>Api: asks for this Traveler's tracked destinations
+    Web->>Api: asks for the tracked destination that address names
     Api->>Clerk: establishes who the caller is
     alt no valid sign-in
         Clerk-->>Api: no identity
@@ -245,20 +257,20 @@ sequenceDiagram
         Web-->>Traveler: sends them to sign in, remembering the address they wanted
     else signed in
         Clerk-->>Api: the Traveler's identity
-        Api->>Db: reads the tracked destinations owned by this Traveler
-        Db-->>Api: the Traveler's own records, in recorded order
-        Api-->>Web: the Traveler's list
-        Web->>Web: looks for the addressed destination among the Traveler's own records
-        alt it is one of theirs
+        Api->>Db: reads the tracked destination with this identifier owned by this Traveler
+        Db-->>Api: one record, or none
+        alt one record
+            Api-->>Web: the tracked destination
             Web-->>Traveler: opens that destination's detail view
-        else not theirs, removed, or never existed
-            Note over Web: one path, one outcome — the identifier's shape is never inspected first
+        else none
+            Note over Api: one query, one answer — not-yours, removed and never-existed are the same miss
+            Api-->>Web: refuses identically in all three cases
             Web-->>Traveler: selects nothing, replaces the address with the plain home address, and shows one message
         end
     end
 ```
 
-The three rejection cases share a single branch by design: the system asks only whether the addressed destination is among the ones this Traveler owns, and never asks whether it exists at all. Because the answer is derived from the Traveler's own list rather than from a lookup by identifier, there is no query whose absence of a row could be timed or distinguished, and no malformed-identifier check that could reject early with a different shape of failure.
+The three rejection cases share a single branch by construction rather than by discipline. The handler asks one question — is there a record with this identifier that belongs to the caller — and the ownership-scoped query returns zero rows in all three cases, executing the same plan whether the row is someone else's, was removed, or never existed. There is no shape check, format validation or existence probe that could reject earlier or differently, and no second query whose presence or absence could be timed. The Traveler's own list is fetched alongside this resolution to render the list beside the content; it is not what answers the address.
 
 **The opening read** forks four ways — a confirmed read with records, a confirmed read with none (the only route to the first-run screen), a confirmed invalid sign-in, and every other failure. A confirmed invalid sign-in takes precedence over the recoverable error, and nothing retries on its own before that error is shown. It is drawn in full at the `sequences` stage; its precedence rule is fixed here and in §8.
 
@@ -289,7 +301,7 @@ The existing CI workflow (`.github/workflows/ci.yml`) runs `pnpm build`, `pnpm t
 | Authorization | Ownership is the only rule: every read and every write is scoped to the caller's own Traveler id in the query itself, never filtered after the fact. There is no role, no sharing and no second principal. | §5 app layer; ADR-0008 |
 | Route protection | Every new page and API route is added to the narrow allowlist in `src/middleware.ts`. `/dashboard/:path*` already covers the detail page; `/api/v1/destinations` and `/api/v1/destinations/:path*` must be added explicitly. | `src/middleware.ts` `config.matcher` |
 | Error handling | Unified envelope `{ error: { code, message } }` via `toErrorEnvelope` / `mapUnknownError`; app-layer functions return typed `{ status, body }` and the route serializes. Codes namespaced `destinations.*`: `destinations.unsupported_reference` (AC-02), `destinations.not_found` (AC-06 / removal). | `src/lib/errors.ts`; §5 app layer |
-| Not-found as authorization | A tracked destination that is not the caller's, one that was removed, and one that never existed are one case with one code, one message and one code path. No branch inspects the shape of an identifier before the ownership-scoped lookup, so there is no early rejection to distinguish. | ADR-0008 |
+| Not-found as authorization | A tracked destination that is not the caller's, one that was removed, and one that never existed are one case with one code (`destinations.not_found`), one message and one code path — for reads and removals alike. Both go through the same ownership-scoped lookup, which returns zero rows in all three cases and executes the same plan, so no branch inspects the shape of an identifier and none can be timed apart. | ADR-0008 |
 | Error precedence | A confirmed invalid sign-in always wins: the client routes to sign-in and stops showing tracked destinations rather than rendering the recoverable error. Every other failure — offline, timeout, unreadable answer, server fault — collapses into one presentation with a Traveler-driven retry. Nothing retries on its own (`retry: false`), and nothing polls in the background for invalidation. | ADR-0001; spec AC-11, AC-14 |
 | Session discard | On a confirmed sign-out the whole query cache is dropped with `queryClient.clear()`, not a list of named keys, so no future resource can leak by forgetting to register. | ADR-0007 |
 | ID strategy | UUIDv7, generated app-side by a new shared `src/lib/id.ts` — this feature is the repository's first consumer of the convention `CLAUDE.md` already mandates. | ADR-0009; `CLAUDE.md` |
@@ -329,8 +341,8 @@ Each top-3 goal from §1 expanded into a full scenario. Every number is quoted f
 **QG-1. Confidentiality of a Traveler's tracked set**
 
 - **When:** a request touches tracked destinations that are not the caller's — a saved address naming another Traveler's record, a removed one or one that never existed; a removal request naming any of those; a create naming a destination reference the catalogue does not contain; or a second Traveler signing in on a device a first Traveler just signed out of.
-- **Then:** every read and every write resolves against the caller's own records only. All three not-yours cases produce one outcome by one path — one `destinations.not_found`, one message, no early rejection on identifier shape and no difference in what the Traveler sees. An unsupported reference is refused with `destinations.unsupported_reference` and nothing is recorded, whatever path the request arrived by. On a confirmed sign-out the whole query cache is cleared, so nothing of the previous Traveler is shown at any point — not even for an instant — before the new Traveler's own list is read. An unauthenticated visitor is sent to sign in and learns nothing: not the number of tracked destinations, not their names, not whether the address named a real one.
-- **How verify:** app-layer tests asserting the ownership scope is in the query rather than applied afterwards; a test asserting the three not-yours cases are indistinguishable in status, code and message; a test that submits an unsupported reference directly to the app layer, bypassing the picker entirely (AC-02 is a guarantee for any request, and ADR-0006 makes it code-enforced rather than database-enforced, so this test is the guarantee); a test asserting `queryClient.clear()` runs on a confirmed sign-out and that a second Traveler's first render shows nothing of the first; an e2e path confirming an unauthenticated visit redirects and reveals nothing. Security review sign-off is required before ship (spec §6.1).
+- **Then:** every read and every write resolves against the caller's own records only. All three not-yours cases produce one outcome by one path — one `destinations.not_found`, one message, no early rejection on identifier shape and no difference in what the Traveler sees — and this holds identically for reading a destination by its saved address and for removing one, because both resolve through the same ownership-scoped lookup. An unsupported reference is refused with `destinations.unsupported_reference` and nothing is recorded, whatever path the request arrived by. On a confirmed sign-out the whole query cache is cleared, so nothing of the previous Traveler is shown at any point — not even for an instant — before the new Traveler's own list is read. An unauthenticated visitor is sent to sign in and learns nothing: not the number of tracked destinations, not their names, not whether the address named a real one.
+- **How verify:** app-layer tests asserting the ownership scope is in the query rather than applied afterwards; a test asserting the three not-yours cases are indistinguishable in status, code and message, run against both the by-identifier read and the removal; a test that submits an unsupported reference directly to the app layer, bypassing the picker entirely (AC-02 is a guarantee for any request, and ADR-0006 makes it code-enforced rather than database-enforced, so this test is the guarantee); a test asserting `queryClient.clear()` runs on a confirmed sign-out and that a second Traveler's first render shows nothing of the first; an e2e path confirming an unauthenticated visit redirects and reveals nothing. Security review sign-off is required before ship (spec §6.1).
 
 **QG-2. Keyboard operability and accessibility of the three overlay surfaces**
 
@@ -350,14 +362,15 @@ No decision was deferred during the Socratic walk, so no row here originates fro
 
 | Risk / debt | Severity | Mitigation | Owner |
 |---|---|---|---|
-| The app shell may not ship first, or may ship without a header slot a page can place a navigation control into. AC-12's narrow-screen list control has nowhere to live, and the header, logout and linked-account confirmation this SAD assumes away are still inside `src/modules/dashboard/`. | High | Spec §1 names the slot as the single requirement this feature places on the shell, and whoever specifies the shell reads it as an input. Confirm the slot exists before starting `tasks`; if it does not, this feature blocks rather than re-absorbing the shell. | Tech Lead |
+| The app shell may not ship first, or may ship without one of the two things §2 requires of it: a header slot a page can place a navigation control into, and a confirmed sign-out that clears the query cache. Without the slot, AC-12's narrow-screen list control has nowhere to live; without the cache clear, AC-15 fails silently and a second Traveler on a shared device can be shown the first Traveler's list. | High | Spec §1 names the slot; the cache clear is added by this SAD (§2, ADR-0007) and whoever specifies the shell reads both as inputs. Confirm both exist before starting `tasks`; if either does not, this feature blocks rather than re-absorbing the shell. | Tech Lead |
 | Hand-rolled focus trapping (ADR-0004) is where QG-2 rests, and its classic defects — shift-tab wrapping at the first focusable element, ordering when one surface opens over another, restoring focus to a control that has since unmounted — are subtle enough to pass a component test. The jsdom accessibility check cannot see real focus order or computed contrast. | Medium | **Accepted with no additional mitigation, deliberately.** The evidence is what §10 QG-2 already commits to: component-test assertions on focus movement for all three surfaces plus `axe-core` at the serious-and-critical floor. A real-browser check was considered and declined this pass. | Tech Lead |
 | The ordering rule exists in two implementations — the server's read query and the client's cache splice (ADR-0005) — and they can drift, producing a list that is ordered one way on first load and another after an add. | Medium | The rule is stated once in §8 and both implementations cite it. A test that adds a record and asserts the spliced list matches a freshly read one would close it; §10 QG-3's assertions cover the confirmed-state property but not this equivalence. | Tech Lead |
 | AC-02's refusal of an unsupported destination reference is enforced in application code, not by the database (ADR-0006). A future write path that skips the app layer would store a reference the catalogue does not contain. | Medium | §10 QG-1 tests the refusal at the app-layer boundary, bypassing the picker, so the guarantee is asserted where it lives. `CLAUDE.md`'s rule that no raw SQL exists outside `src/db/` keeps the number of possible write paths at one. | Tech Lead |
 | Nothing is observable in production. Every §6 target is verified by a single timed run in the test suite and nowhere else; no error rate, no latency, no failure signal exists. The first indication that reads are failing or writes are slow is a Traveler noticing. | Medium | Accepted this pass by spec §3, which excludes analytics, telemetry and production timing on the grounds that choosing a measurement path for a product holding travel data is its own decision. §7 states the consequence explicitly so it is not discovered later. | PM (spec §8, due before public launch) |
 | `docs/architecture-map.md` is stale and actively misleading: it reflects commit `53d3d41`, states that no code exists yet, names Auth.js as the identity provider where the app uses Clerk, and describes a server-actions data approach that neither shipped feature follows. A reader trusting it would design against a system that does not exist. | Medium | This SAD's §2, §3 and §5 are written from the repository at HEAD and supersede the map for this feature. Re-run `/sdd:survey` in brownfield mode to refresh it. | Tech Lead |
+| Resolving a saved address goes through a by-identifier read endpoint (ADR-0008), so a prober now has a direct server oracle where §6's earlier client-side resolution had none. | Low | The endpoint runs one ownership-scoped query that returns zero rows for not-yours, removed and never-existed alike, so all three execute the same plan and return the same status, code and message — there is no second query, no shape check and no early exit to time apart. §10 QG-1 asserts the indistinguishability against this endpoint directly. | Tech Lead |
 | A UUIDv7 identifier embeds a millisecond creation timestamp, so anyone holding a saved address learns when that tracked destination was created (ADR-0009). | Low | Accepted. The address is already the owner's to hold or share, and it discloses nothing the address does not. Adding a separate opaque public identifier remains additive if that changes. | Tech Lead |
-| `queryClient.clear()` (ADR-0007) supersedes the shipped `clearDashboardQuery` named-key pattern, leaving two ways to do the same thing and a weaker one still in the tree. | Low | Retire `clearDashboardQuery` when this feature lands rather than leaving both patterns for the next feature to choose between. | Tech Lead |
+| `queryClient.clear()` (ADR-0007) supersedes the shipped `clearDashboardQuery` named-key pattern, leaving two ways to do the same thing and a weaker one still in the tree. | Low | Retire `clearDashboardQuery` **after the shell ships**, not in this feature's diff — it lives in `src/modules/dashboard/`, which ADR-0003 deliberately leaves untouched while the shell is rewriting it. Once the shell owns the sign-out clear (§2), the retirement is the shell's to make. | Tech Lead |
 | Open architectural decision: should a Traveler's tracked set be capped? | Open question | Resolve before `/sdd:data-model`. Default now: no cap — repeated records are legitimate by design, and §6 requires the list to stay operable at 500 entries, so the blast radius is the Traveler's own account. | Tech Lead |
 | Open architectural decision: when does offline creation — and offline reading — of tracked destinations arrive, given the app is described as offline-first and this pass is online-only in both directions? | Open question | Resolve when the sync feature is designed. Default now: online-only; a failed read or add surfaces as AC-11's recoverable error. ADR-0001's HTTP surface is what a sync layer would reconcile against. | Tech Lead |
 | Open architectural decision: is "tracked destination" still the right primitive once trips exist, or should the model move to a permission-to-stay the Traveler holds? | Open question | Resolve before `/sdd:design` of the visa-type-and-dates feature. Default now: unresolved; the strategic review flagged permission-to-stay as the model that dissolves the problem. Every §5 building block assumes the current primitive. | Tech Lead |
