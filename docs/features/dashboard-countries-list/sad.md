@@ -238,7 +238,131 @@ sequenceDiagram
 
 The Traveler may already track the same destination; that is allowed and creates a separate record, so nothing in this flow consults the existing list before recording. The list changes only on the confirming branch — the §6 budget of 800 ms is measured across this whole exchange, which is why it is one round trip (ADR-0005). A failure of the recording step leaves the cache untouched and surfaces the recoverable error of AC-11.
 
-**Critical flow 2: resolving a saved address (AC-05, AC-06, AC-13)**
+**The opening read** forks four ways — a confirmed read with records, a confirmed read with none (the only route to the first-run screen), a confirmed invalid sign-in, and every other failure. A confirmed invalid sign-in takes precedence over the recoverable error, and nothing retries on its own before that error is shown. It is drawn in full below; its precedence rule is fixed here and in §8.
+
+### Flow: opening the list (AC-03, AC-07, AC-10, AC-11, AC-13)
+
+```mermaid
+sequenceDiagram
+    actor Traveler
+    participant Web as Web UI
+    participant Api as API routes
+    participant Clerk
+    participant Db as Application database
+
+    Traveler->>Web: opens the app
+    Web->>Api: asks for the Traveler's tracked destinations
+    Api->>Clerk: establishes who the caller is
+    alt no valid sign-in
+        Clerk-->>Api: no identity
+        Api-->>Web: refuses, revealing nothing about any tracked destination
+        Web-->>Traveler: sends them to sign in
+    else signed in
+        Clerk-->>Api: the Traveler's identity
+        Api->>Db: reads every tracked destination owned by this Traveler
+        alt read fails
+            Db-->>Api: failure
+            Api-->>Web: reports a recoverable error
+            Web-->>Traveler: shows one error presentation with a retry, the same whatever the cause; nothing retries on its own
+        else read confirmed
+            Db-->>Api: zero or more records, in recorded order
+            Api-->>Web: confirms the list, most recent last, tie broken by each record's own identifier
+            alt one or more records
+                Web-->>Traveler: shows the list with nothing selected, inviting a choice
+                Note over Web: on a narrow screen the list opens by itself over the content; on a wider screen it sits beside the content
+            else none
+                Web-->>Traveler: shows the first-run screen with no list beside it
+            end
+        end
+    end
+```
+
+This is the fork §6 forecasts above: a confirmed invalid sign-in (top branch) always wins over the recoverable error, and the first-run screen is reachable only down the *confirmed* empty branch — never from the failure branch, which is why "read fails" and "zero records" are separate outcomes of the same confirmed/unconfirmed split rather than one case. Nothing here polls in the background; the read runs once, on open, per the query defaults of §8.
+
+### Flow: selecting a tracked destination from the list (AC-16)
+
+```mermaid
+sequenceDiagram
+    actor Traveler
+    participant Web as Web UI
+
+    Traveler->>Web: chooses a tracked destination from the list
+    Web->>Web: reads that destination from the already-confirmed cached list
+    Web-->>Traveler: opens its detail view at its own address, naming the destination and stating nothing is recorded for it yet
+    Note over Web: on a narrow screen, choosing a destination also closes the list drawer and moves focus to the detail view
+```
+
+No new read crosses to the API here: the chosen record already came back confirmed on the opening read (previous flow) or on an add (critical flow 1), so the detail view is populated from the cache — the address changes, but nothing is fetched again. A destination the catalogue no longer offers to add opens identically, under the name it was created with (AC-09; enforced structurally at write time, not re-checked on read — see §11).
+
+### Flow: removing a tracked destination (AC-08, AC-14, AC-17)
+
+```mermaid
+sequenceDiagram
+    actor Traveler
+    participant Web as Web UI
+    participant Api as API routes
+    participant Clerk
+    participant Db as Application database
+
+    Traveler->>Web: opens a tracked destination and confirms its removal in the confirmation the app presents
+    Note over Web: the destination stays in the list until the removal is confirmed — no optimistic disappearance
+    Web->>Api: asks to remove this tracked destination
+    Api->>Clerk: establishes who the caller is
+    alt confirmed invalid sign-in
+        Clerk-->>Api: no valid identity
+        Api-->>Web: refuses; nothing was removed
+        Web-->>Traveler: sends them to sign in and stops showing tracked destinations
+    else signed in
+        Clerk-->>Api: the Traveler's identity
+        Api->>Db: deletes the tracked destination with this identifier owned by this Traveler
+        alt removal cannot be completed
+            Db-->>Api: failure
+            Api-->>Web: reports that the removal did not happen
+            Web-->>Traveler: keeps the destination in the list exactly as it was, with one unambiguous message that it was not removed
+        else removal confirmed
+            Db-->>Api: the removal is recorded
+            Api-->>Web: confirms the removal
+            Web->>Web: removes the confirmed record from the cached list
+            alt other tracked destinations remain
+                Web-->>Traveler: shows the list with nothing selected
+            else that was the last one
+                Web-->>Traveler: shows the first-run screen
+            end
+        end
+    end
+```
+
+The confirmed-invalid-sign-in branch here is the same precedence rule as the opening-list flow's top branch (§8 "Error precedence") — it takes priority over the recoverable-error branch whichever action triggers it (add, remove, or a read), so it is drawn once here rather than duplicated inside critical flow 1. The removal-failure branch leaves the cache untouched by construction: nothing is spliced out until `Db` confirms.
+
+### Flow: sign-out clears the cache (AC-15)
+
+```mermaid
+sequenceDiagram
+    actor Traveler
+    participant Web as Web UI
+    participant Clerk
+    participant Api as API routes
+    participant Db as Application database
+
+    Traveler->>Web: signs out
+    Web->>Clerk: ends the sign-in
+    Clerk-->>Web: sign-out confirmed
+    Web->>Web: discards the whole query cache (not a list of named keys)
+    Note over Web: nothing of this Traveler's tracked destinations remains in memory
+
+    Traveler->>Web: signs in again on the same device (same or different Traveler)
+    Web->>Api: asks for the tracked destinations of whoever just signed in
+    Api->>Clerk: establishes who the caller is
+    Clerk-->>Api: the new Traveler's identity
+    Api->>Db: reads every tracked destination owned by this Traveler
+    Db-->>Api: this Traveler's own records only
+    Api-->>Web: confirms the list
+    Web-->>Traveler: shows only what belongs to whoever is now signed in
+```
+
+The cache discard is the shell's own action (§2, ADR-0007) shown here at this feature's boundary: the clear happens before any next sign-in can complete, so there is no point at which the new Traveler's first render could still hold the previous Traveler's list. This is a sync flow, not async — sign-out is a Traveler-driven action with an immediate confirmation, not a callback or scheduled job.
+
+### Flow: resolving a saved address (AC-05, AC-06, AC-13)
 
 ```mermaid
 sequenceDiagram
@@ -272,7 +396,41 @@ sequenceDiagram
 
 The three rejection cases share a single branch by construction rather than by discipline. The handler asks one question — is there a record with this identifier that belongs to the caller — and the ownership-scoped query returns zero rows in all three cases, executing the same plan whether the row is someone else's, was removed, or never existed. There is no shape check, format validation or existence probe that could reject earlier or differently, and no second query whose presence or absence could be timed. The Traveler's own list is fetched alongside this resolution to render the list beside the content; it is not what answers the address.
 
-**The opening read** forks four ways — a confirmed read with records, a confirmed read with none (the only route to the first-run screen), a confirmed invalid sign-in, and every other failure. A confirmed invalid sign-in takes precedence over the recoverable error, and nothing retries on its own before that error is shown. It is drawn in full at the `sequences` stage; its precedence rule is fixed here and in §8.
+**Use-case coverage.**
+
+| User story | Flow(s) |
+|---|---|
+| US-01 Add a tracked destination | Critical flow 1: adding a tracked destination |
+| US-02 See my tracked destinations | Opening the list; Sign-out clears the cache |
+| US-03 Open a tracked destination | Selecting a tracked destination from the list |
+| US-04 Remove a tracked destination | Removing a tracked destination |
+| US-05 Start with nothing tracked | Opening the list (confirmed-empty branch) |
+| US-06 Use my list on a phone | Shown as narrow-screen notes inside Opening the list and Selecting a tracked destination — no dedicated flow, per §5's width fork being identical wiring at both widths |
+| US-07 Come back to where I was | Resolving a saved address |
+
+**Acceptance-criteria coverage.**
+
+| AC | Shown by |
+|---|---|
+| AC-01 | Critical flow 1 (confirming branch) |
+| AC-02 | Critical flow 1 (catalogue-refusal branch) |
+| AC-03 | Opening the list (confirmed-with-records branch) |
+| AC-04 | N/A — the add action's placement and modality is a UI affordance with no runtime branch; not a mutation or a read |
+| AC-05 | Resolving a saved address |
+| AC-06 | Resolving a saved address (none-of-three branch) |
+| AC-07 | Opening the list (confirmed-with-records branch; nothing pre-selected) |
+| AC-08 | Removing a tracked destination (confirmed branch) |
+| AC-09 | N/A — enforced once, at write time, in Critical flow 1 (ADR-0006); no read branch re-checks the catalogue, so a delisted reference has no runtime path to draw on read |
+| AC-10 | Opening the list (confirmed-empty branch) and Removing a tracked destination (last-one-remaining branch) |
+| AC-11 | Opening the list (read-fails branch) |
+| AC-12 | Shown via notes across Critical flow 1, Opening the list and Selecting a tracked destination (narrow-screen focus movement); the contract itself is component-level, verified by §10 QG-2, not a sequence branch |
+| AC-13 | Opening the list (no-valid-sign-in branch) and Resolving a saved address (no-valid-sign-in branch) |
+| AC-14 | Removing a tracked destination (confirmed-invalid-sign-in branch), standing for the same precedence rule on add and on the opening read alike (§8 "Error precedence") |
+| AC-15 | Sign-out clears the cache |
+| AC-16 | Selecting a tracked destination from the list |
+| AC-17 | Removing a tracked destination (removal-cannot-complete branch) |
+
+Both passes are clean: every §4 user story maps to at least one flow, and every §5 AC is shown by a flow, a branch, or an explicit non-runtime N/A with its reason. No flow needed a participant beyond the §5 vocabulary, so nothing new is flagged for `design` to reconcile.
 
 ## 7. Deployment view
 
