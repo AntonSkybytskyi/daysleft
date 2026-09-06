@@ -90,4 +90,23 @@ describe("POST /api/v1/destinations", () => {
       },
     });
   });
+
+  it("AC-02: returns the same 422 refusal, never a 500, for a missing or non-string destination_ref", async () => {
+    const deps = makeDeps();
+
+    const missing = await handleAddDestination(deps, {} as { destination_ref: string });
+    const wrongType = await handleAddDestination(deps, { destination_ref: 42 as unknown as string });
+
+    for (const result of [missing, wrongType]) {
+      expect(result).toEqual({
+        status: 422,
+        body: {
+          error: {
+            code: "destinations.unsupported_reference",
+            message: "Only the destinations the app supports can be tracked.",
+          },
+        },
+      });
+    }
+  });
 });
