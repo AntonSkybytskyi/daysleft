@@ -14,6 +14,7 @@ import { DestinationDetail } from "./DestinationDetail";
 import { DestinationListDrawer } from "./DestinationListDrawer";
 import { DestinationPicker } from "./DestinationPicker";
 import { FirstRunScreen } from "./FirstRunScreen";
+import { ListUnavailable } from "./ListUnavailable";
 import type { TrackedDestinationJson } from "@/modules/destinations/app/destinations-query";
 
 export type DestinationsViewProps = {
@@ -129,6 +130,13 @@ function SavedAddress({
         }}
       />
     );
+  }
+
+  // AC-11: any read failure other than a confirmed invalid sign-in or a not-yours/removed/
+  // never-existed miss (both handled above) is the one recoverable error, with a
+  // Traveler-driven retry — never an unresolved spinner.
+  if (query.isError && !sessionInvalid) {
+    return <ListUnavailable onRetry={() => query.refetch()} isRetrying={query.isFetching} />;
   }
 
   return (

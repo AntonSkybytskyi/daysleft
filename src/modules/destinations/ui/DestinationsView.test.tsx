@@ -121,6 +121,25 @@ describe("DestinationsView", () => {
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/dashboard?unavailable=1"));
   });
 
+  it("AC-11: shows ListUnavailable with a working retry instead of hanging when a saved-address read fails for a reason other than session-invalid or not-found", async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === "/api/v1/destinations/d1") {
+        return Promise.resolve(mockFetchResponse(500));
+      }
+      return Promise.resolve(
+        mockFetchResponse(200, {
+          items: [{ id: "d1", destination_ref: "thailand", created_at: "2026-01-01T00:00:00Z" }],
+        }),
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderView("d1");
+
+    await waitFor(() => expect(screen.getByText(/couldn't be read|can't be read|unavailable/i)).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: /retry|try again/i })).toBeInTheDocument();
+  });
+
   it("shows the not-available message on the plain home address after a rejected saved address (AC-06)", async () => {
     vi.stubGlobal(
       "fetch",
