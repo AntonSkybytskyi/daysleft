@@ -44,6 +44,17 @@ describe("DestinationListDrawer", () => {
     expect(screen.getByRole("button", { name: "+ Add" })).toBeInTheDocument();
   });
 
+  it("AC-01: closes itself once a destination becomes selected (e.g. a confirmed add), not only on an explicit onSelect click", () => {
+    mockMatchMedia(true);
+
+    const { rerender } = render(<DestinationListDrawer destinations={destinations} onSelect={vi.fn()} onAdd={vi.fn()} />);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+    rerender(<DestinationListDrawer destinations={destinations} selectedId="d1" onSelect={vi.fn()} onAdd={vi.fn()} />);
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
   it("stays closed on a narrow screen when something is selected, until the toggle opens it", async () => {
     mockMatchMedia(true);
     const user = userEvent.setup();

@@ -51,6 +51,14 @@ export function DestinationListDrawer({ destinations, selectedId, onSelect, onAd
     }
   }, [isNarrow, selectedId]);
 
+  // A confirmed add closes the drawer exactly as choosing a destination does (AC-01) — this
+  // covers both, since the picker's own onAdd only closes itself, not the drawer beneath it.
+  useEffect(() => {
+    if (selectedId) {
+      setIsOpen(false);
+    }
+  }, [selectedId]);
+
   if (!isNarrow) {
     return <DestinationList destinations={destinations} selectedId={selectedId} onSelect={onSelect} onAdd={onAdd} />;
   }
