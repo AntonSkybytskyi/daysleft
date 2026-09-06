@@ -1,8 +1,12 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Modal } from "@/modules/ui/Modal/Modal";
 import { DestinationList, type DestinationListProps } from "./DestinationList";
 
 const NARROW_SCREEN_QUERY = "(max-width: 767px)";
+// The app shell's header exposes this id as its nav slot (sad.md §2, AC-12) — a page places
+// its narrow-screen navigation control there rather than in the content body.
+const HEADER_NAV_SLOT_ID = "app-header-nav-slot";
 
 function canMatchMedia(): boolean {
   return typeof window !== "undefined" && typeof window.matchMedia === "function";
@@ -33,6 +37,13 @@ export type DestinationListDrawerProps = DestinationListProps;
 export function DestinationListDrawer({ destinations, selectedId, onSelect, onAdd }: DestinationListDrawerProps) {
   const isNarrow = useIsNarrowScreen();
   const [isOpen, setIsOpen] = useState(false);
+  // Resolved after mount (SSR-safe) so the toggle can portal into the app shell's header nav
+  // slot when one is mounted, falling back to rendering inline for isolated component tests.
+  const [navSlot, setNavSlot] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    setNavSlot(document.getElementById(HEADER_NAV_SLOT_ID));
+  }, []);
 
   useEffect(() => {
     if (isNarrow && !selectedId) {
@@ -44,11 +55,15 @@ export function DestinationListDrawer({ destinations, selectedId, onSelect, onAd
     return <DestinationList destinations={destinations} selectedId={selectedId} onSelect={onSelect} onAdd={onAdd} />;
   }
 
+  const toggle = (
+    <button type="button" onClick={() => setIsOpen(true)}>
+      Your destinations
+    </button>
+  );
+
   return (
     <>
-      <button type="button" onClick={() => setIsOpen(true)}>
-        Your destinations
-      </button>
+      {navSlot ? createPortal(toggle, navSlot) : toggle}
       {isOpen && (
         <Modal title="Your destinations" onClose={() => setIsOpen(false)}>
           <DestinationList

@@ -57,6 +57,22 @@ describe("DestinationListDrawer", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
+  it("AC-12: portals its narrow-screen toggle into the header's nav slot when one is mounted", () => {
+    mockMatchMedia(true);
+    const slot = document.createElement("div");
+    slot.id = "app-header-nav-slot";
+    document.body.appendChild(slot);
+
+    try {
+      render(<DestinationListDrawer destinations={destinations} selectedId="d1" onSelect={vi.fn()} onAdd={vi.fn()} />);
+
+      const toggle = screen.getByRole("button", { name: "Your destinations" });
+      expect(slot.contains(toggle)).toBe(true);
+    } finally {
+      slot.remove();
+    }
+  });
+
   it("has 0 serious/critical axe violations when open", async () => {
     mockMatchMedia(true);
 

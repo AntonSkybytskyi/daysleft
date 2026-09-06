@@ -18,4 +18,9 @@ describe("Header", () => {
 
     expect(onLogout).toHaveBeenCalledOnce();
   });
+
+  it("AC-12: exposes a nav slot a page can put a navigation control into", () => {
+    const { container } = render(<Header title="daysleft" />);
+    expect(container.querySelector("#app-header-nav-slot")).toBeInTheDocument();
+  });
 });
