@@ -24,6 +24,6 @@
 | T17 | Build RemoveConfirmation | ui | Tech Lead | S | T12, T14 | done |
 | T18 | Build DestinationDetail, FirstRunScreen, ListUnavailable | ui | Tech Lead | M | T14 | done |
 | T19 | Wire the dashboard pages (home + detail address) | wiring | Tech Lead | S | T11, T15, T16, T17, T18 | done |
-| T20 | Add cross-cutting quality verification | tests | Tech Lead | M | T19 | todo |
+| T20 | Add cross-cutting quality verification | tests | Tech Lead | M | T19 | done |
 
 **Total:** 20 tasks, ~10 person-days (one developer, per `sad.md §2` Organisational constraints).
