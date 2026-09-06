@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { handleListDestinations, handleAddDestination } from "./route";
+import { handleListDestinations, handleAddDestination } from "./handlers";
 import type { DestinationsDeps } from "@/modules/destinations/infra/destinations-deps";
 
 function makeDeps(overrides: Partial<DestinationsDeps> = {}): DestinationsDeps {

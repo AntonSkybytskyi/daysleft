@@ -5,6 +5,7 @@ import {
   destinationsQueryOptions,
   addDestinationMutationOptions,
   removeDestinationMutationOptions,
+  resolveSavedAddressQueryOptions,
   DestinationsSessionInvalidError,
 } from "./destinations-query";
 
@@ -78,6 +79,44 @@ describe("addDestinationMutationOptions", () => {
     await mutateAsync({ destination_ref: "thailand" });
 
     expect(queryClient.getQueryData(key)).toEqual({ items: [created] });
+  });
+});
+
+describe("resolveSavedAddressQueryOptions", () => {
+  it("resolves ok with the record on a 200 response", async () => {
+    const row = { id: "d1", destination_ref: "thailand", created_at: "2026-01-01T00:00:00Z" };
+    fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => row });
+
+    const options = resolveSavedAddressQueryOptions("d1");
+    const result = await (options.queryFn as () => Promise<unknown>)();
+
+    expect(result).toEqual({ kind: "ok", destination: row });
+  });
+
+  it("resolves not_found on a 404 response, without throwing (AC-06 is not a query error)", async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 404,
+      json: async () => ({ error: { code: "destinations.not_found", message: "x" } }),
+    });
+
+    const options = resolveSavedAddressQueryOptions("missing");
+    const result = await (options.queryFn as () => Promise<unknown>)();
+
+    expect(result).toEqual({ kind: "not_found" });
+  });
+
+  it("throws a typed DestinationsSessionInvalidError on a 401 response", async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({ error: { code: "auth.session_invalid", message: "x" } }),
+    });
+
+    const options = resolveSavedAddressQueryOptions("d1");
+    await expect((options.queryFn as () => Promise<unknown>)()).rejects.toBeInstanceOf(
+      DestinationsSessionInvalidError,
+    );
   });
 });
 

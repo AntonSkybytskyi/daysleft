@@ -52,6 +52,42 @@ export function destinationsQueryOptions(userId: string) {
   });
 }
 
+export type ResolveSavedAddressResult =
+  | { kind: "ok"; destination: TrackedDestinationJson }
+  | { kind: "not_found" };
+
+// not-yours/removed/never-existed collapse to one not_found (AC-06) — not a query error, since
+// it's an expected, handled outcome the caller falls back on, not a read failure (AC-11).
+async function resolveSavedAddress(trackedDestinationId: string): Promise<ResolveSavedAddressResult> {
+  const response = await fetch(`/api/v1/destinations/${trackedDestinationId}`);
+
+  if (response.status === 401) {
+    throw new DestinationsSessionInvalidError();
+  }
+
+  if (response.status === 404) {
+    return { kind: "not_found" };
+  }
+
+  if (!response.ok) {
+    throw new Error(`Resolve saved address failed with status ${response.status}`);
+  }
+
+  return { kind: "ok", destination: (await response.json()) as TrackedDestinationJson };
+}
+
+export function resolveSavedAddressQueryOptions(trackedDestinationId: string) {
+  return queryOptions({
+    queryKey: ["destinations", "saved-address", trackedDestinationId] as const,
+    queryFn: () => resolveSavedAddress(trackedDestinationId),
+    staleTime: Infinity,
+    gcTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    retry: false,
+  });
+}
+
 async function postDestination(destinationRef: string): Promise<TrackedDestinationJson> {
   const response = await fetch("/api/v1/destinations", {
     method: "POST",

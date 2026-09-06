@@ -4,12 +4,17 @@ import { DestinationList, type DestinationListProps } from "./DestinationList";
 
 const NARROW_SCREEN_QUERY = "(max-width: 767px)";
 
+function canMatchMedia(): boolean {
+  return typeof window !== "undefined" && typeof window.matchMedia === "function";
+}
+
 function useIsNarrowScreen(): boolean {
-  const [isNarrow, setIsNarrow] = useState(
-    () => typeof window !== "undefined" && window.matchMedia(NARROW_SCREEN_QUERY).matches,
-  );
+  const [isNarrow, setIsNarrow] = useState(() => canMatchMedia() && window.matchMedia(NARROW_SCREEN_QUERY).matches);
 
   useEffect(() => {
+    if (!canMatchMedia()) {
+      return;
+    }
     const mediaQueryList = window.matchMedia(NARROW_SCREEN_QUERY);
     const handleChange = () => setIsNarrow(mediaQueryList.matches);
     handleChange();

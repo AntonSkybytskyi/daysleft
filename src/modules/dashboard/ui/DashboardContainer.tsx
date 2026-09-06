@@ -15,9 +15,10 @@ import { DashboardScreen, type DashboardScreenState, type DashboardScreenStrings
 
 export type DashboardContainerProps = {
   strings?: Partial<DashboardScreenStrings>;
+  children?: React.ReactNode;
 };
 
-export function DashboardContainer({ strings }: DashboardContainerProps = {}) {
+export function DashboardContainer({ strings, children }: DashboardContainerProps = {}) {
   const router = useRouter();
   const clerk = useClerk();
   const queryClient = useQueryClient();
@@ -141,6 +142,8 @@ export function DashboardContainer({ strings }: DashboardContainerProps = {}) {
       isRetrying={query.isFetching}
       linked={linked}
       strings={strings}
-    />
+    >
+      {children}
+    </DashboardScreen>
   );
 }

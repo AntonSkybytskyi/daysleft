@@ -33,9 +33,18 @@ export type DashboardScreenProps = {
   isRetrying?: boolean;
   linked?: boolean;
   strings?: Partial<DashboardScreenStrings>;
+  children?: React.ReactNode;
 };
 
-export function DashboardScreen({ state, onLogout, onRetry, isRetrying, linked, strings }: DashboardScreenProps) {
+export function DashboardScreen({
+  state,
+  onLogout,
+  onRetry,
+  isRetrying,
+  linked,
+  strings,
+  children,
+}: DashboardScreenProps) {
   const t = { ...defaultStrings, ...strings };
   return (
     <div>
@@ -57,7 +66,7 @@ export function DashboardScreen({ state, onLogout, onRetry, isRetrying, linked, 
       {state === "default" && (
         <>
           {linked && <Alert variant="success">{t.linkedAccount}</Alert>}
-          <EmptyState heading={t.emptyHeading} body={t.emptyBody} />
+          {children ?? <EmptyState heading={t.emptyHeading} body={t.emptyBody} />}
         </>
       )}
     </div>
