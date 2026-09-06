@@ -26,4 +26,14 @@
 | T19 | Wire the dashboard pages (home + detail address) | wiring | Tech Lead | S | T11, T15, T16, T17, T18 | done |
 | T20 | Add cross-cutting quality verification | tests | Tech Lead | M | T19 | done |
 
-**Total:** 20 tasks, ~10 person-days (one developer, per `sad.md §2` Organisational constraints).
+| T21 | Review fix: clear whole query cache on confirmed sign-out (AC-15) | wiring | Tech Lead | S | T13 | done |
+| T22 | Review fix: render not-available message on rejected saved address (AC-06) | ui | Tech Lead | S | T19 | done |
+| T23 | Review fix: route session-invalid add to sign-in (AC-14) | ui | Tech Lead | S | T14, T16 | done |
+| T24 | Review fix: route session-invalid removal to sign-in (AC-14) | ui | Tech Lead | S | T14, T17 | done |
+| T25 | Review fix: narrow-screen toggle into header slot (AC-12) | ui | Tech Lead | S | T15 | done |
+| T26 | Review fix: close drawer + move focus to detail on add/select (AC-01) | ui | Tech Lead | S | T15, T18 | done |
+| T27 | Review fix: ListUnavailable instead of hung spinner on saved-address failure (AC-11) | ui | Tech Lead | S | T18, T19 | done |
+| T28 | Review fix: Modal focus trap + top-most-only Escape (AC-12) | ui | Tech Lead | S | T12 | done |
+| T29 | Review fix: validate POST body at boundary (AC-02) | ports | Tech Lead | S | T9 | done |
+
+**Total:** 20 tasks, ~10 person-days (one developer, per `sad.md §2` Organisational constraints), plus 9 review-driven follow-up tasks (review-2026-09-06).
