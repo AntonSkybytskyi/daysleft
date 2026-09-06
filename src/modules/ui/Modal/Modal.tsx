@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 
 type ModalProps = {
   title: string;
@@ -6,31 +6,77 @@ type ModalProps = {
   children: React.ReactNode;
 };
 
-// Focus in / focus restore / Escape — the shared contract every overlay surface in this feature
-// (list drawer, add picker, removal confirmation) relies on (AC-12).
+// Every currently-mounted Modal instance, outermost first. Escape must act on the top-most
+// one only (ADR-0004's accepted stacking-order risk) — one Modal opening over another (the
+// add picker over the narrow-screen drawer) must not let a single Escape close both.
+const openModalIds: string[] = [];
+
+function focusableElements(root: HTMLElement): HTMLElement[] {
+  return Array.from(
+    root.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    ),
+  );
+}
+
+// Focus in / focus restore / focus trap / Escape (top-most only) — the shared contract every
+// overlay surface in this feature (list drawer, add picker, removal confirmation) relies on
+// (AC-12, ADR-0004).
 export function Modal({ title, onClose, children }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
+  const id = useId();
 
   useEffect(() => {
     previouslyFocused.current = document.activeElement as HTMLElement | null;
     dialogRef.current?.focus();
+    openModalIds.push(id);
 
     return () => {
       previouslyFocused.current?.focus();
+      const index = openModalIds.indexOf(id);
+      if (index !== -1) {
+        openModalIds.splice(index, 1);
+      }
     };
-  }, []);
+  }, [id]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        onClose();
+        if (openModalIds[openModalIds.length - 1] === id) {
+          onClose();
+        }
+        return;
+      }
+
+      if (event.key !== "Tab" || openModalIds[openModalIds.length - 1] !== id) {
+        return;
+      }
+
+      const dialog = dialogRef.current;
+      if (!dialog) {
+        return;
+      }
+      const focusable = focusableElements(dialog);
+      if (focusable.length === 0) {
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
       }
     }
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  }, [id, onClose]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
