@@ -5,11 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { resolveReturnTo } from "@/modules/auth/app/return-to";
-import {
-  clearDashboardQuery,
-  DashboardSessionInvalidError,
-  dashboardQueryOptions,
-} from "@/modules/dashboard/app/dashboard-query";
+import { DashboardSessionInvalidError, dashboardQueryOptions } from "@/modules/dashboard/app/dashboard-query";
 import { DASHBOARD_PATH } from "@/modules/dashboard/app/get-dashboard";
 import { DashboardScreen, type DashboardScreenState, type DashboardScreenStrings } from "./DashboardScreen";
 
@@ -101,12 +97,12 @@ export function DashboardContainer({ strings, children }: DashboardContainerProp
       setStatus("error-logout-failed");
       return;
     }
-    // The server confirmed the session is gone — clear this Traveler's cache entry right away,
-    // independent of whatever happens to the client-side signOut() below, so a next Traveler
-    // signing in on this device never reads a previous Traveler's cached dashboard data.
-    if (user?.id) {
-      clearDashboardQuery(queryClient, user.id);
-    }
+    // The server confirmed the session is gone — clear the whole cache right away, independent
+    // of whatever happens to the client-side signOut() below, so a next Traveler signing in on
+    // this device never reads any previous Traveler's cached data, from this feature or any
+    // other (dashboard-countries-list AC-15, ADR-0007) — never a list of named keys, since that
+    // would silently miss a resource that forgets to register.
+    queryClient.clear();
     setSessionCleared(true);
     // The server already revoked the session — that's authoritative, so a rejection here
     // never re-POSTs the logout endpoint (it now 401s with no server session left). Instead

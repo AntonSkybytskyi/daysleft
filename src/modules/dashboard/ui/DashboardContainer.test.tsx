@@ -510,4 +510,27 @@ describe("DashboardContainer — identity-scoped cache clears on logout (T6)", (
     expect(screen.queryByText(/signed in to your existing account/i)).not.toBeInTheDocument();
     expect(client.getQueryData(dashboardQueryModule.dashboardQueryKey("travelerA"))).toBeUndefined();
   });
+
+  it("AC-15 (dashboard-countries-list): clears the whole query cache on confirmed sign-out, not only the dashboard key, so another feature's cached data never survives to the next Traveler", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    // Stands in for another feature's cache entry (e.g. destinations) that must not
+    // survive a confirmed sign-out even though this container knows nothing about it.
+    client.setQueryData(["destinations", "travelerA"], { items: [{ id: "d1" }] });
+    signOut.mockReset();
+    signOut.mockResolvedValue(undefined);
+
+    useUserMock.mockReturnValue({ user: { id: "travelerA" }, isLoaded: true });
+    const fetchMockA = vi
+      .fn()
+      .mockResolvedValueOnce(mockFetchResponse(200, { user: { id: "travelerA", email: "a@travel.com" }, has_trips: false }))
+      .mockResolvedValueOnce(mockFetchResponse(204));
+    vi.stubGlobal("fetch", fetchMockA);
+
+    renderDashboard(client);
+    await waitFor(() => expect(screen.getByText(/nothing tracked yet/i)).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole("button", { name: "Log out" }));
+
+    await waitFor(() => expect(client.getQueryData(["destinations", "travelerA"])).toBeUndefined());
+  });
 });
