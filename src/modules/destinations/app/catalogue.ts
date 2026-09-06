@@ -16,3 +16,13 @@ export const destinationCatalogue: readonly DestinationCatalogueEntry[] = [
 export function isSupportedDestinationRef(ref: string): boolean {
   return destinationCatalogue.some((entry) => entry.ref === ref);
 }
+
+// A delisted reference still resolves under its original name (AC-09) — this never relabels
+// it, it just has no catalogue entry to read a display name from, so it falls back to the ref.
+export function destinationDisplayName(ref: string): string {
+  const entry = destinationCatalogue.find((candidate) => candidate.ref === ref);
+  if (entry) {
+    return entry.displayName;
+  }
+  return ref.length > 0 ? ref.charAt(0).toUpperCase() + ref.slice(1) : ref;
+}

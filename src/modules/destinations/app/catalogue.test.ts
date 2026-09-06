@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { destinationCatalogue, isSupportedDestinationRef } from "./catalogue";
+import { destinationCatalogue, destinationDisplayName, isSupportedDestinationRef } from "./catalogue";
 
 describe("destinationCatalogue", () => {
   it("exposes exactly the five named entries", () => {
@@ -28,5 +28,15 @@ describe("isSupportedDestinationRef", () => {
   it("returns false for any reference not in the catalogue", () => {
     expect(isSupportedDestinationRef("atlantis")).toBe(false);
     expect(isSupportedDestinationRef("")).toBe(false);
+  });
+});
+
+describe("destinationDisplayName", () => {
+  it("returns the catalogue's display name for a current reference", () => {
+    expect(destinationDisplayName("thailand")).toBe("Thailand");
+  });
+
+  it("falls back to a capitalized ref for a delisted reference (AC-09) — never relabels it", () => {
+    expect(destinationDisplayName("atlantis")).toBe("Atlantis");
   });
 });
