@@ -7,6 +7,7 @@ import {
   DestinationsSessionInvalidError,
   resolveSavedAddressQueryOptions,
 } from "@/modules/destinations/app/destinations-query";
+import { Alert } from "@/modules/ui/Alert/Alert";
 import { Spinner } from "@/modules/ui/Spinner/Spinner";
 import { DestinationsContainer, type DestinationsHelpers } from "./DestinationsContainer";
 import { DestinationDetail } from "./DestinationDetail";
@@ -17,11 +18,12 @@ import type { TrackedDestinationJson } from "@/modules/destinations/app/destinat
 
 export type DestinationsViewProps = {
   trackedDestinationId?: string;
+  addressUnavailable?: boolean;
 };
 
 // Composes the list/drawer, the add picker, the detail view and the first-run screen — the
 // page-level wiring T19 needs, on top of DestinationsContainer's query/session/error handling.
-export function DestinationsView({ trackedDestinationId }: DestinationsViewProps) {
+export function DestinationsView({ trackedDestinationId, addressUnavailable }: DestinationsViewProps) {
   return (
     <DestinationsContainer>
       {(destinations, helpers) => (
@@ -29,6 +31,7 @@ export function DestinationsView({ trackedDestinationId }: DestinationsViewProps
           destinations={destinations}
           helpers={helpers}
           trackedDestinationId={trackedDestinationId}
+          addressUnavailable={addressUnavailable}
         />
       )}
     </DestinationsContainer>
@@ -39,10 +42,12 @@ function DestinationsBody({
   destinations,
   helpers,
   trackedDestinationId,
+  addressUnavailable,
 }: {
   destinations: TrackedDestinationJson[];
   helpers: DestinationsHelpers;
   trackedDestinationId?: string;
+  addressUnavailable?: boolean;
 }) {
   const router = useRouter();
   const [isPickerOpen, setIsPickerOpen] = useState(false);
@@ -80,7 +85,10 @@ function DestinationsBody({
         {trackedDestinationId ? (
           <SavedAddress trackedDestinationId={trackedDestinationId} helpers={helpers} />
         ) : (
-          <p className="py-16 text-center text-slate-600">Choose a destination from your list.</p>
+          <>
+            {addressUnavailable && <Alert variant="error">That destination isn&apos;t available.</Alert>}
+            <p className="py-16 text-center text-slate-600">Choose a destination from your list.</p>
+          </>
         )}
       </div>
       {picker}
@@ -107,7 +115,7 @@ function SavedAddress({
       return;
     }
     if (notFound) {
-      router.replace("/dashboard");
+      router.replace("/dashboard?unavailable=1");
     }
   }, [sessionInvalid, notFound, router, trackedDestinationId]);
 

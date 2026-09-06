@@ -118,6 +118,26 @@ describe("DestinationsView", () => {
 
     renderView("missing");
 
-    await waitFor(() => expect(replace).toHaveBeenCalledWith("/dashboard"));
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/dashboard?unavailable=1"));
+  });
+
+  it("shows the not-available message on the plain home address after a rejected saved address (AC-06)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        mockFetchResponse(200, {
+          items: [{ id: "d1", destination_ref: "thailand", created_at: "2026-01-01T00:00:00Z" }],
+        }),
+      ),
+    );
+
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <DestinationsView addressUnavailable />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByText("That destination isn't available.")).toBeInTheDocument());
+    expect(screen.getByText(/choose a destination/i)).toBeInTheDocument();
   });
 });
