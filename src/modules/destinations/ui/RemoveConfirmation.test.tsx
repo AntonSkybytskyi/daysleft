@@ -2,6 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "jest-axe";
 import { describe, expect, it, vi } from "vitest";
+import { DestinationsSessionInvalidError } from "@/modules/destinations/app/destinations-query";
 import { RemoveConfirmation } from "./RemoveConfirmation";
 
 describe("RemoveConfirmation", () => {
@@ -38,6 +39,18 @@ describe("RemoveConfirmation", () => {
 
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/not removed/i));
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("AC-14: does not show the not-removed message on a confirmed invalid sign-in — the container routes away instead", async () => {
+    const user = userEvent.setup();
+    const onConfirm = vi.fn().mockRejectedValue(new DestinationsSessionInvalidError());
+    const onClose = vi.fn();
+
+    render(<RemoveConfirmation destinationName="Thailand" onConfirm={onConfirm} onClose={onClose} />);
+    await user.click(screen.getByRole("button", { name: "Remove" }));
+
+    await waitFor(() => expect(onConfirm).toHaveBeenCalled());
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("has 0 serious/critical axe violations", async () => {

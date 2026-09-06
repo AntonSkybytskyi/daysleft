@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { DestinationsSessionInvalidError } from "@/modules/destinations/app/destinations-query";
 import { Alert } from "@/modules/ui/Alert/Alert";
 import { Modal } from "@/modules/ui/Modal/Modal";
 
@@ -21,8 +22,13 @@ export function RemoveConfirmation({ destinationName, onConfirm, onClose }: Remo
     try {
       await onConfirm();
       onClose();
-    } catch {
-      setFailed(true);
+    } catch (err) {
+      // A confirmed invalid sign-in (AC-14) is the container's job — it routes to sign-in and
+      // stops showing tracked destinations. Showing the not-removed message here would
+      // misreport it as a removal failure.
+      if (!(err instanceof DestinationsSessionInvalidError)) {
+        setFailed(true);
+      }
     } finally {
       setIsRemoving(false);
     }

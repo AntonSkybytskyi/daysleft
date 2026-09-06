@@ -35,7 +35,15 @@ export function DestinationsContainer({ children }: DestinationsContainerProps) 
   const enabled = isLoaded && Boolean(user);
   const query = useQuery({ ...destinationsQueryOptions(userId), enabled });
 
-  const sessionInvalidError = query.error instanceof DestinationsSessionInvalidError ? query.error : undefined;
+  const addMutation = useMutation(addDestinationMutationOptions(queryClient, userId));
+  const removeMutation = useMutation(removeDestinationMutationOptions(queryClient, userId));
+
+  // A confirmed invalid sign-in can arrive from the read, an add, or a removal alike (AC-14) —
+  // whichever one caught it, the outcome is the same: route away and stop showing the list.
+  const sessionInvalidError =
+    (query.error instanceof DestinationsSessionInvalidError ? query.error : undefined) ??
+    (addMutation.error instanceof DestinationsSessionInvalidError ? addMutation.error : undefined) ??
+    (removeMutation.error instanceof DestinationsSessionInvalidError ? removeMutation.error : undefined);
 
   useEffect(() => {
     if (sessionInvalidError) {
@@ -43,9 +51,6 @@ export function DestinationsContainer({ children }: DestinationsContainerProps) 
       router.replace(`/login?return_to=${encodeURIComponent(path)}`);
     }
   }, [sessionInvalidError, router]);
-
-  const addMutation = useMutation(addDestinationMutationOptions(queryClient, userId));
-  const removeMutation = useMutation(removeDestinationMutationOptions(queryClient, userId));
 
   const helpers: DestinationsHelpers = {
     addDestination: (destinationRef) => addMutation.mutateAsync({ destination_ref: destinationRef }),

@@ -2,6 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "jest-axe";
 import { describe, expect, it, vi } from "vitest";
+import { DestinationsSessionInvalidError } from "@/modules/destinations/app/destinations-query";
 import { DestinationPicker } from "./DestinationPicker";
 
 describe("DestinationPicker", () => {
@@ -35,6 +36,18 @@ describe("DestinationPicker", () => {
 
     await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("AC-14: does not show the catalogue-refusal message on a confirmed invalid sign-in — the container routes away instead", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const onAdd = vi.fn().mockRejectedValue(new DestinationsSessionInvalidError());
+
+    render(<DestinationPicker onAdd={onAdd} onClose={onClose} />);
+    await user.click(screen.getByRole("button", { name: "Thailand" }));
+
+    await waitFor(() => expect(onAdd).toHaveBeenCalled());
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("has 0 serious/critical axe violations", async () => {

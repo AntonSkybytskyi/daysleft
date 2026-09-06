@@ -91,4 +91,56 @@ describe("DestinationsContainer", () => {
       expect.anything(),
     );
   });
+
+  it("AC-14: routes to sign-in when an add mutation reports a confirmed invalid sign-in", async () => {
+    const fetchMock = vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
+      if (init?.method === "POST") {
+        return Promise.resolve(mockFetchResponse(401, { error: { code: "auth.session_invalid", message: "x" } }));
+      }
+      return Promise.resolve(mockFetchResponse(200, { items: [] }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    let helpersRef: { addDestination: (ref: string) => Promise<unknown> } | undefined;
+    renderContainer(
+      vi.fn((_destinations, helpers) => {
+        helpersRef = helpers;
+        return <div>rendered</div>;
+      }),
+    );
+
+    await waitFor(() => expect(screen.getByText("rendered")).toBeInTheDocument());
+    await helpersRef?.addDestination("thailand").catch(() => undefined);
+
+    await waitFor(() => expect(replace).toHaveBeenCalled());
+    expect(replace.mock.calls[0][0]).toMatch(/^\/login\?return_to=/);
+  });
+
+  it("AC-14: routes to sign-in when a remove mutation reports a confirmed invalid sign-in", async () => {
+    const fetchMock = vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
+      if (init?.method === "DELETE") {
+        return Promise.resolve(mockFetchResponse(401, { error: { code: "auth.session_invalid", message: "x" } }));
+      }
+      return Promise.resolve(
+        mockFetchResponse(200, {
+          items: [{ id: "d1", destination_ref: "thailand", created_at: "2026-01-01T00:00:00Z" }],
+        }),
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    let helpersRef: { removeDestination: (id: string) => Promise<unknown> } | undefined;
+    renderContainer(
+      vi.fn((_destinations, helpers) => {
+        helpersRef = helpers;
+        return <div>rendered</div>;
+      }),
+    );
+
+    await waitFor(() => expect(screen.getByText("rendered")).toBeInTheDocument());
+    await helpersRef?.removeDestination("d1").catch(() => undefined);
+
+    await waitFor(() => expect(replace).toHaveBeenCalled());
+    expect(replace.mock.calls[0][0]).toMatch(/^\/login\?return_to=/);
+  });
 });

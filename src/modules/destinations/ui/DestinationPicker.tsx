@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { destinationCatalogue } from "@/modules/destinations/app/catalogue";
+import { DestinationsSessionInvalidError } from "@/modules/destinations/app/destinations-query";
 import { Alert } from "@/modules/ui/Alert/Alert";
 import { Modal } from "@/modules/ui/Modal/Modal";
 import { Spinner } from "@/modules/ui/Spinner/Spinner";
@@ -20,8 +21,13 @@ export function DestinationPicker({ onAdd, onClose }: DestinationPickerProps) {
     setSubmittingRef(ref);
     try {
       await onAdd(ref);
-    } catch {
-      setError("Only the destinations the app supports can be tracked.");
+    } catch (err) {
+      // A confirmed invalid sign-in (AC-14) is the container's job — it routes to sign-in and
+      // stops showing tracked destinations. Showing the catalogue-refusal message here would
+      // misreport it.
+      if (!(err instanceof DestinationsSessionInvalidError)) {
+        setError("Only the destinations the app supports can be tracked.");
+      }
     } finally {
       setSubmittingRef(null);
     }
