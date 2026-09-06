@@ -4,7 +4,6 @@ import { useUser } from "@clerk/nextjs";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { Alert } from "@/modules/ui/Alert/Alert";
 import { Spinner } from "@/modules/ui/Spinner/Spinner";
 import {
   addDestinationMutationOptions,
@@ -13,6 +12,7 @@ import {
   DestinationsSessionInvalidError,
   type TrackedDestinationJson,
 } from "@/modules/destinations/app/destinations-query";
+import { ListUnavailable } from "./ListUnavailable";
 
 export type DestinationsHelpers = {
   addDestination: (destinationRef: string) => Promise<TrackedDestinationJson>;
@@ -62,14 +62,7 @@ export function DestinationsContainer({ children }: DestinationsContainerProps) 
   }
 
   if (query.isError || query.errorUpdateCount > 0) {
-    return (
-      <Alert variant="error">
-        Your tracked destinations couldn&apos;t be read.{" "}
-        <button type="button" onClick={() => query.refetch()}>
-          Retry
-        </button>
-      </Alert>
-    );
+    return <ListUnavailable onRetry={() => query.refetch()} isRetrying={query.isFetching} />;
   }
 
   return <Spinner label="Loading your tracked destinations" />;
