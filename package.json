@@ -15,8 +15,8 @@
     "lint": "eslint . && tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:up": "tsx scripts/migrate-up.ts",
-    "db:down": "tsx scripts/migrate-down.ts",
+    "db:up": "tsx --env-file-if-exists=.env.local scripts/migrate-up.ts",
+    "db:down": "tsx --env-file-if-exists=.env.local scripts/migrate-down.ts",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f db"
