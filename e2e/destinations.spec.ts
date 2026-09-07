@@ -39,7 +39,7 @@ test.describe("dashboard-countries-list", () => {
 
     await page.goto("/dashboard/00000000-0000-7000-8000-000000000000");
 
-    await page.waitForURL("/dashboard");
+    await page.waitForURL(/\/dashboard(\?|$)/);
     await expect(page.getByText("That destination isn't available.")).toBeVisible();
   });
 
