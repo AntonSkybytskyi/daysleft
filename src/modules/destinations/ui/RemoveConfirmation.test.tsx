@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { axe } from "jest-axe";
+import { axe } from "vitest-axe";
 import { describe, expect, it, vi } from "vitest";
 import { DestinationsSessionInvalidError } from "@/modules/destinations/app/destinations-query";
 import { RemoveConfirmation } from "./RemoveConfirmation";

@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { axe } from "jest-axe";
+import { axe } from "vitest-axe";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DestinationListDrawer } from "./DestinationListDrawer";
 import type { TrackedDestinationJson } from "@/modules/destinations/app/destinations-query";
