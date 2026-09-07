@@ -1,0 +1,303 @@
+openapi: 3.1.0
+
+info:
+  title: dashboard-countries-list API
+  version: 0.1.0
+  description: |
+    Backs a Traveler's persistent, curated list of tracked destinations — adding one from the
+    five-entry destination catalogue, listing them, opening one at its own address, and removing
+    one permanently behind a confirmation (spec.md §1). Every read and write is scoped to the
+    caller's own records (sad.md §8 Authorization; ADR-0008); the catalogue itself is a frozen
+    in-code constant, not a resource this API exposes (ADR-0006).
+
+servers:
+  - url: https://api.example.com
+    description: Production
+  - url: http://localhost
+    description: Local
+
+security:
+  - BearerAuth: []
+
+paths:
+  /api/v1/destinations:
+    get:
+      summary: List the signed-in Traveler's tracked destinations
+      operationId: listTrackedDestinations
+      security:
+        - SessionAuth: []
+      responses:
+        "200":
+          description: >-
+            OK — every tracked destination owned by the caller, in recorded order, most recent
+            last, tied broken by each record's own id (AC-03; sad.md §6 "opening the list").
+            Unpaginated: sad.md §7 fixes the operating ceiling at 500 tracked destinations per
+            Traveler and the read returns the whole list below it (ADR-0005's cache splice
+            assumes exactly this) — a deliberate deviation from cursor pagination, recorded in
+            `api-sync-report.md`.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TrackedDestinationList" }
+              examples:
+                withRecords:
+                  value:
+                    items:
+                      - id: "01935e4a-6f3a-7c21-9c3e-1a2b3c4d5e6f"
+                        destination_ref: "thailand"
+                        created_at: "2026-08-01T09:00:00Z"
+                empty:
+                  value: { items: [] }
+        "401":
+          description: >-
+            No valid sign-in — nothing about the Traveler's tracked destinations is revealed
+            (AC-13; sad.md §6 "opening the list", no-valid-sign-in branch).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example:
+                error:
+                  code: "auth.session_invalid"
+                  message: "Sign in to view your tracked destinations."
+
+    post:
+      summary: Add a tracked destination
+      operationId: addTrackedDestination
+      security:
+        - SessionAuth: []
+      description: >-
+        No `Idempotency-Key` — sad.md §6 critical flow 1 shows no retry note or async actor
+        (ADR-0005: one confirmed round trip), and a duplicate is not an error to dedupe against:
+        AC-01 explicitly allows adding a destination the Traveler already tracks, which creates a
+        separate record.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TrackedDestinationCreate" }
+            example:
+              destination_ref: "thailand"
+      responses:
+        "201":
+          description: >-
+            Recorded and confirmed (AC-01; sad.md §6 critical flow 1, confirming branch). The
+            client splices this exact record into the cached list — nothing optimistic beforehand.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TrackedDestination" }
+              example:
+                id: "01935e4b-1a02-7abc-9def-0123456789ab"
+                destination_ref: "thailand"
+                created_at: "2026-09-06T12:00:00Z"
+        "401":
+          description: No valid sign-in.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example:
+                error:
+                  code: "auth.session_invalid"
+                  message: "Sign in to add a tracked destination."
+        "422":
+          description: >-
+            The reference isn't one the destination catalogue contains — refused for any request
+            however it arrives, and nothing is recorded (AC-02; sad.md §6 critical flow 1,
+            catalogue-refusal branch; ADR-0006 enforces this app-side, not by the database).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example:
+                error:
+                  code: "destinations.unsupported_reference"
+                  message: "Only the destinations the app supports can be tracked."
+
+  /api/v1/destinations/{trackedDestinationId}:
+    get:
+      summary: Resolve one tracked destination by its saved address
+      operationId: getTrackedDestination
+      security:
+        - SessionAuth: []
+      parameters:
+        - in: path
+          name: trackedDestinationId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: >-
+            The tracked destination this address names (AC-05, AC-16; sad.md §6 "resolving a
+            saved address", one-record branch).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TrackedDestination" }
+              example:
+                id: "01935e4b-1a02-7abc-9def-0123456789ab"
+                destination_ref: "thailand"
+                created_at: "2026-09-06T12:00:00Z"
+        "401":
+          description: >-
+            No valid sign-in — the caller is sent to sign in and learns nothing about any
+            tracked destination (AC-13; sad.md §6 "resolving a saved address", no-valid-sign-in
+            branch).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example:
+                error:
+                  code: "auth.session_invalid"
+                  message: "Sign in to view this tracked destination."
+        "404":
+          description: >-
+            Not-yours, removed, and never-existed are one outcome by one path — no early
+            rejection on the identifier's shape and no difference in what the Traveler sees
+            (AC-06; sad.md §6 "resolving a saved address", none branch; ADR-0008). The client
+            replaces the address with the plain home address and shows one message.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example:
+                error:
+                  code: "destinations.not_found"
+                  message: "That destination isn't available."
+
+    delete:
+      summary: Permanently remove a tracked destination
+      operationId: removeTrackedDestination
+      security:
+        - SessionAuth: []
+      parameters:
+        - in: path
+          name: trackedDestinationId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204":
+          description: >-
+            Removal recorded and confirmed (AC-08; sad.md §6 "removing a tracked destination",
+            confirmed branch) — the client removes the record from the cached list only now,
+            never before.
+        "401":
+          description: >-
+            A confirmed invalid sign-in takes precedence over every other outcome, including a
+            removal already underway (AC-14; sad.md §6 "removing a tracked destination",
+            confirmed-invalid-sign-in branch; sad.md §8 Error precedence). Nothing is removed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example:
+                error:
+                  code: "auth.session_invalid"
+                  message: "Sign in to manage your tracked destinations."
+        "404":
+          description: >-
+            Not-yours, already removed, or never existed — the same ownership-scoped miss the
+            read path uses (AC-06 parity; ADR-0008).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example:
+                error:
+                  code: "destinations.not_found"
+                  message: "That destination isn't available."
+        "500":
+          description: >-
+            The removal could not be completed for a reason other than authorization — the
+            tracked destination remains in the list exactly as it was, and the message must never
+            leave it ambiguous whether the removal happened (AC-17; sad.md §6 "removing a tracked
+            destination", removal-cannot-complete branch). No dedicated code is minted for this:
+            it is the repo's existing generic server-fault path (`src/lib/errors.ts`
+            `mapUnknownError`), which every non-authorization failure already collapses into on
+            the client as one recoverable-error presentation (AC-11).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example:
+                error:
+                  code: "internal.unexpected"
+                  message: "Something went wrong."
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    SessionAuth:
+      type: apiKey
+      in: cookie
+      name: __session
+      description: >-
+        Clerk-issued session cookie, verified server-side via the Clerk SDK (sad.md §8
+        Authentication) — same deviation from the template's BearerAuth default already recorded
+        by the `auth-user-plus-dashboard` contract (ADR-0001 there): Clerk manages sessions as
+        cookies for this same-origin web app, not client-supplied bearer tokens. BearerAuth stays
+        the documented global default for any future machine-to-machine endpoint.
+
+  responses:
+    Error:
+      description: Error — unified envelope
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    Error:
+      description: >-
+        The unified error envelope every API route returns for a non-2xx response
+        (CLAUDE.md — Conventions: Error handling).
+      type: object
+      required: [error]
+      additionalProperties: false
+      properties:
+        error: { $ref: "#/components/schemas/ErrorBody" }
+
+    ErrorBody:
+      type: object
+      required: [code, message]
+      additionalProperties: false
+      properties:
+        code:
+          type: string
+          pattern: "^[a-z_]+\\.[a-z_]+$"
+          example: "destinations.not_found"
+        message: { type: string }
+        details:
+          type: object
+          description: optional structured context
+
+    # Traces to data-model.md `tracked_destinations` (id, destination_ref, created_at).
+    # `user_id` is the ownership scope, never exposed in the response — sad.md §8 Authorization.
+    TrackedDestination:
+      type: object
+      required: [id, destination_ref, created_at]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: App-generated UUID v7 (data-model.md `tracked_destinations.id`; ADR-0009).
+        destination_ref:
+          type: string
+          description: >-
+            The destination catalogue reference this record names (data-model.md
+            `tracked_destinations.destination_ref`). Validated against the frozen catalogue at
+            write time only (ADR-0006) — a delisted reference still resolves here unchanged
+            (AC-09), so no enum is pinned in this schema.
+        created_at: { type: string, format: date-time }
+
+    TrackedDestinationCreate:
+      type: object
+      required: [destination_ref]
+      additionalProperties: false
+      properties:
+        destination_ref:
+          type: string
+          description: Must name one of the destinations the catalogue currently supports (AC-02).
+
+    TrackedDestinationList:
+      type: object
+      required: [items]
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/TrackedDestination" }

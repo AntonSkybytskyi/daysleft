@@ -36,5 +36,7 @@ export const config = {
     "/check-email",
     "/api/v1/dashboard",
     "/api/v1/auth/logout",
+    "/api/v1/destinations",
+    "/api/v1/destinations/:path*",
   ],
 };
