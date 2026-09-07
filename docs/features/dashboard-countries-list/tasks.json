@@ -197,6 +197,87 @@
       "acs": ["AC-03", "AC-12"],
       "dod": "a test asserts a freshly read list matches the client-spliced list after an add (ordering equivalence, sad.md §11); a single timed test run asserts the list read completes within 500ms and a confirmed add/removal within 800ms against a stubbed network; axe-core runs across all three overlay surfaces together at 0 serious/critical violations",
       "files_hint": ["e2e/", "src/modules/destinations/"]
+    },
+    {
+      "id": "T21",
+      "title": "Review fix: clear the whole query cache on confirmed sign-out (AC-15)",
+      "layer": "wiring",
+      "deps": ["T13"],
+      "acs": ["AC-15"],
+      "dod": "a test asserts queryClient.clear() runs when sign-out is confirmed, so [\"destinations\", userId] (and every other cached key) is gone before a second Traveler's first render on the same device",
+      "files_hint": ["src/modules/dashboard/ui/DashboardContainer.tsx", "src/modules/dashboard/app/dashboard-query.ts"]
+    },
+    {
+      "id": "T22",
+      "title": "Review fix: render the not-available message on a rejected saved address (AC-06)",
+      "layer": "ui",
+      "deps": ["T19"],
+      "acs": ["AC-06"],
+      "dod": "a component test asserts \"That destination isn't available.\" renders when a saved address resolves not-yours/removed/never-existed, and that the address bar is replaced with /dashboard without losing the message off-screen; a reload of /dashboard afterward shows the plain list with no message",
+      "files_hint": ["src/modules/destinations/ui/DestinationsView.tsx"]
+    },
+    {
+      "id": "T23",
+      "title": "Review fix: route a confirmed invalid sign-in on add to sign-in instead of showing a catalogue-refusal message (AC-14)",
+      "layer": "ui",
+      "deps": ["T14", "T16"],
+      "acs": ["AC-14"],
+      "dod": "a component test asserts a DestinationsSessionInvalidError raised by an add mutation routes the Traveler to sign-in and stops showing tracked destinations, rather than rendering \"Only the destinations the app supports can be tracked.\"",
+      "files_hint": ["src/modules/destinations/ui/DestinationsContainer.tsx", "src/modules/destinations/ui/DestinationPicker.tsx"]
+    },
+    {
+      "id": "T24",
+      "title": "Review fix: route a confirmed invalid sign-in on removal to sign-in instead of showing a not-removed message (AC-14)",
+      "layer": "ui",
+      "deps": ["T14", "T17"],
+      "acs": ["AC-14"],
+      "dod": "a component test asserts a DestinationsSessionInvalidError raised by the remove mutation routes the Traveler to sign-in and stops showing tracked destinations, rather than rendering \"This destination was not removed.\"",
+      "files_hint": ["src/modules/destinations/ui/DestinationsContainer.tsx", "src/modules/destinations/ui/RemoveConfirmation.tsx"]
+    },
+    {
+      "id": "T25",
+      "title": "Review fix: move the narrow-screen list toggle into the app shell's header slot (AC-12)",
+      "layer": "ui",
+      "deps": ["T15"],
+      "acs": ["AC-12"],
+      "dod": "a component test asserts the narrow-screen toggle renders inside the header's nav slot (not the content body) when the header is mounted, with a documented fallback for isolated component tests that mount the drawer without a header",
+      "files_hint": ["src/modules/ui/Header/Header.tsx", "src/modules/destinations/ui/DestinationListDrawer.tsx"]
+    },
+    {
+      "id": "T26",
+      "title": "Review fix: close the narrow-screen drawer and move focus to the detail view on add/select (AC-01)",
+      "layer": "ui",
+      "deps": ["T15", "T18"],
+      "acs": ["AC-01"],
+      "dod": "component tests assert the narrow-screen drawer closes once a destination becomes selected (via add or via choosing one), and that keyboard focus moves onto the newly shown detail view in both cases",
+      "files_hint": ["src/modules/destinations/ui/DestinationListDrawer.tsx", "src/modules/destinations/ui/DestinationDetail.tsx"]
+    },
+    {
+      "id": "T27",
+      "title": "Review fix: show ListUnavailable instead of hanging on a spinner for a failed saved-address read (AC-11)",
+      "layer": "ui",
+      "deps": ["T18", "T19"],
+      "acs": ["AC-11"],
+      "dod": "a component test asserts a saved-address read failing for a reason other than session-invalid or not-found (offline/500/timeout/unreadable) renders ListUnavailable with a working retry, instead of an unresolved spinner",
+      "files_hint": ["src/modules/destinations/ui/DestinationsView.tsx"]
+    },
+    {
+      "id": "T28",
+      "title": "Review fix: give Modal a real focus trap and top-most-only Escape handling",
+      "layer": "ui",
+      "deps": ["T12"],
+      "acs": ["AC-12"],
+      "dod": "component tests assert Tab and Shift+Tab cycle within the open dialog without leaving it, and that Escape closes only the top-most of two stacked Modal instances, leaving the one beneath open",
+      "files_hint": ["src/modules/ui/Modal/Modal.tsx"]
+    },
+    {
+      "id": "T29",
+      "title": "Review fix: validate the POST /api/v1/destinations body at the boundary instead of a generic 500 on malformed input (AC-02)",
+      "layer": "ports",
+      "deps": ["T9"],
+      "acs": ["AC-02"],
+      "dod": "a route test asserts a missing, null, or malformed request body returns the same 422 destinations.unsupported_reference refusal as an unsupported reference, never a 500",
+      "files_hint": ["src/app/api/v1/destinations/route.ts", "src/app/api/v1/destinations/handlers.ts"]
     }
   ]
 }
